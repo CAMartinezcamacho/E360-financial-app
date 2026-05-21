@@ -15,7 +15,6 @@ import { HistoryPanel } from '@/components/history-panel'
 import { UpcomingPayments } from '@/components/upcoming-payments'
 import { AccountBalances } from '@/components/account-balances'
 import { CreditsPanel } from '@/components/credits-panel'
-import { RecurringDebts } from '@/components/recurring-debts'
 import { DailyQuotaDebts } from '@/components/daily-quota-debts'
 import { DailyChart } from '@/components/daily-chart'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -255,18 +254,6 @@ export default function FinanceDashboard() {
               onDelete={deleteDailyQuotaDebt}
               onToggleActive={toggleDailyQuotaDebtActive}
               getDetails={getDailyQuotaDetails}
-              formatCurrency={formatCurrency}
-            />
-
-            {/* Recurring Debts - Integrated with Daily Target */}
-            <RecurringDebts
-              debts={state.recurringDebts}
-              dailyDebtPortion={calculateDailyDebtPortion}
-              totalMonthlyDebts={totalMonthlyRecurringDebts}
-              onAdd={addRecurringDebt}
-              onUpdate={updateRecurringDebt}
-              onDelete={deleteRecurringDebt}
-              onToggleActive={toggleRecurringDebtActive}
               formatCurrency={formatCurrency}
             />
           </>
