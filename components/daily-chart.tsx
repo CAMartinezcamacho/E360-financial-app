@@ -344,4 +344,16 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
               <div className="text-right min-w-0">
                 <span className="text-sm font-bold block truncate">
                   {summary.totalSales - summary.totalExpenses >= 0 ? '+' : ''}
-                  {formatCurrency(summary.totalSales - summary.
+                  {formatCurrency(summary.totalSales - summary.totalExpenses)}
+                </span>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  V: {formatCurrency(summary.totalSales)} | G: {formatCurrency(summary.totalExpenses)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
