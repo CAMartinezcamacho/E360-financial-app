@@ -17,7 +17,7 @@ const isInternalTransaction = (title: string) =>
   title.startsWith('↗ ') || title.startsWith('↙ ')
 
 const chartConfig = {
-  earnings: { label: 'Ganancias', color: 'hsl(var(--chart-1))' },
+  earnings: { label: 'Ganancias', color: '#22c55e' },
 }
 
 export function HourlyChart({ transactions, formatCurrency, shiftStartHour = 0 }: HourlyChartProps) {
@@ -97,16 +97,16 @@ export function HourlyChart({ transactions, formatCurrency, shiftStartHour = 0 }
       <CardContent className="p-0 pb-3">
         <ChartContainer config={chartConfig} className="h-40 w-full px-2">
           <BarChart data={hourlyData} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 9, fill: '#9ca3af' }}
               tickLine={false}
               axisLine={false}
               interval={2}
             />
             <YAxis
-              tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 9, fill: '#9ca3af' }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
@@ -132,8 +132,8 @@ export function HourlyChart({ transactions, formatCurrency, shiftStartHour = 0 }
                   key={entry.hour}
                   fill={
                     entry.total === maxTotal && entry.total > 0
-                      ? 'hsl(var(--chart-1))'
-                      : 'hsl(var(--chart-1) / 0.4)'
+                      ? '#22c55e'
+                      : '#22c55e66'
                   }
                 />
               ))}

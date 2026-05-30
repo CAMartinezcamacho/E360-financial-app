@@ -35,11 +35,11 @@ const isInternalTransaction = (title: string) => {
 const chartConfig = {
   sales: {
     label: 'Ventas',
-    color: 'hsl(var(--accent))',
+    color: '#22c55e',
   },
   expenses: {
     label: 'Gastos',
-    color: 'hsl(var(--destructive))',
+    color: '#ef4444',
   },
 }
 
@@ -228,30 +228,30 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                   <>
                     <Bar 
                       dataKey="sales" 
-                      fill="hsl(var(--accent))" 
+                      fill="#22c55e" 
                       radius={[2, 2, 0, 0]}
                       maxBarSize={8}
                     >
                       {dailyData.map((entry, index) => (
                         <Cell 
                           key={`sales-${index}`} 
-                          fill={entry.isToday ? 'hsl(var(--accent))' : 'hsl(var(--accent)/0.7)'}
-                          stroke={entry.isToday ? 'hsl(var(--accent))' : 'none'}
+                          fill={entry.isToday ? '#22c55e' : '#22c55e99'}
+                          stroke={entry.isToday ? '#22c55e' : 'none'}
                           strokeWidth={entry.isToday ? 2 : 0}
                         />
                       ))}
                     </Bar>
                     <Bar 
                       dataKey="expenses" 
-                      fill="hsl(var(--destructive))" 
+                      fill="#ef4444" 
                       radius={[2, 2, 0, 0]}
                       maxBarSize={8}
                     >
                       {dailyData.map((entry, index) => (
                         <Cell 
                           key={`expenses-${index}`} 
-                          fill={entry.isToday ? 'hsl(var(--destructive))' : 'hsl(var(--destructive)/0.7)'}
-                          stroke={entry.isToday ? 'hsl(var(--destructive))' : 'none'}
+                          fill={entry.isToday ? '#ef4444' : '#ef444499'}
+                          stroke={entry.isToday ? '#ef4444' : 'none'}
                           strokeWidth={entry.isToday ? 2 : 0}
                         />
                       ))}
@@ -259,7 +259,7 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                   </>
                 ) : (
                   <>
-                    <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                    <ReferenceLine y={0} stroke="#e5e7eb" />
                     <Bar 
                       dataKey="net" 
                       radius={[2, 2, 2, 2]}
@@ -268,9 +268,9 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                       {dailyData.map((entry, index) => (
                         <Cell 
                           key={`net-${index}`} 
-                          fill={entry.net >= 0 ? 'hsl(var(--accent))' : 'hsl(var(--destructive))'}
+                          fill={entry.net >= 0 ? '#22c55e' : '#ef4444'}
                           fillOpacity={entry.isToday ? 1 : 0.7}
-                          stroke={entry.isToday ? (entry.net >= 0 ? 'hsl(var(--accent))' : 'hsl(var(--destructive))') : 'none'}
+                          stroke={entry.isToday ? (entry.net >= 0 ? '#22c55e' : '#ef4444') : 'none'}
                           strokeWidth={entry.isToday ? 2 : 0}
                         />
                       ))}
@@ -344,16 +344,4 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
               <div className="text-right min-w-0">
                 <span className="text-sm font-bold block truncate">
                   {summary.totalSales - summary.totalExpenses >= 0 ? '+' : ''}
-                  {formatCurrency(summary.totalSales - summary.totalExpenses)}
-                </span>
-                <p className="text-[10px] text-muted-foreground truncate">
-                  V: {formatCurrency(summary.totalSales)} | G: {formatCurrency(summary.totalExpenses)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      )}
-    </Card>
-  )
-}
+                  {formatCurrency(summary.totalSales - summary.
