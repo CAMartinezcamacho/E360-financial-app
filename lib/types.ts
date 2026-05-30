@@ -39,6 +39,7 @@ export interface UserSettings {
   userName: string
   currencySymbol: string
   nonWorkingDays: number[] // 0=Sunday, 1=Monday, etc.
+  shiftStartHour: number // Hour (0-23) when work shift starts. Default 0 = midnight.
 }
 
 // "Me Deben" - Money others owe to me

@@ -31,6 +31,7 @@ export default function FinanceDashboard() {
   const {
     isLoaded,
     syncStatus,
+    shiftStartHour,
     state,
     addTransaction,
     deleteTransaction,

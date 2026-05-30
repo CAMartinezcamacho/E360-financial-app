@@ -629,20 +629,36 @@ export function useFinance() {
   const totalFixedExpenses = state.fixedExpenses.reduce((sum, e) => sum + e.amount, 0)
   const unpaidFixedExpenses = state.fixedExpenses.filter((e) => !e.isPaid).reduce((sum, e) => sum + e.amount, 0)
   
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
+  const shiftStartHour = state.settings.shiftStartHour ?? 0
+
+  const getShiftStart = (date: Date): Date => {
+    const d = new Date(date)
+    if (shiftStartHour === 0) {
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+    if (d.getHours() < shiftStartHour) {
+      d.setDate(d.getDate() - 1)
+    }
+    d.setHours(shiftStartHour, 0, 0, 0)
+    return d
+  }
+
+  const now = new Date()
+  const currentShiftStart = getShiftStart(now)
+  const currentShiftEnd = new Date(currentShiftStart.getTime() + 24 * 60 * 60 * 1000)
+  const today = currentShiftStart
+
   const todayTransactions = state.transactions.filter((t) => {
-    const transactionDate = new Date(t.timestamp)
-    transactionDate.setHours(0, 0, 0, 0)
-    return transactionDate.getTime() === today.getTime()
+    const ts = new Date(t.timestamp).getTime()
+    return ts >= currentShiftStart.getTime() && ts < currentShiftEnd.getTime()
   })
 
   const monthTransactions = state.transactions.filter((t) => {
-    const transactionDate = new Date(t.timestamp)
+    const shiftStart = getShiftStart(new Date(t.timestamp))
     return (
-      transactionDate.getMonth() === today.getMonth() &&
-      transactionDate.getFullYear() === today.getFullYear()
+      shiftStart.getMonth() === today.getMonth() &&
+      shiftStart.getFullYear() === today.getFullYear()
     )
   })
 
@@ -941,6 +957,9 @@ export function useFinance() {
     state,
     isLoaded,
     syncStatus,
+    shiftStartHour,
+    getShiftStart,
+    currentShiftStart,
     addTransaction,
     deleteTransaction,
     editTransaction,

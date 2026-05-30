@@ -213,6 +213,34 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
         </CardContent>
       </Card>
 
+      {/* Horario de Turno */}
+      <Card className="border-0 shadow-sm bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            Horario de Turno
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Define a que hora empieza tu turno. Los viajes registrados despues de medianoche se contaran en el turno anterior.
+          </p>
+          <Select
+            value={String(settings.shiftStartHour ?? 0)}
+            onValueChange={(val) => onUpdateSettings({ shiftStartHour: Number(val) })}
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 24 }, (_, i) => {
+                const label = i === 0 ? 'Medianoche (0:00)' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`
+                return <SelectItem key={i} value={String(i)}>{label}</SelectItem>
+              })}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       {/* Dias Laborales */}
       <Card className="border-0 shadow-sm bg-card">
         <CardHeader className="pb-2">
