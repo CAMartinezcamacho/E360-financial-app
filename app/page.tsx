@@ -17,16 +17,20 @@ import { AccountBalances } from '@/components/account-balances'
 import { CreditsPanel } from '@/components/credits-panel'
 import { DailyQuotaDebts } from '@/components/daily-quota-debts'
 import { DailyChart } from '@/components/daily-chart'
+import { HourlyChart } from '@/components/hourly-chart'
+import { QuickEntry } from '@/components/quick-entry'
 import { Skeleton } from '@/components/ui/skeleton'
 
 type TabType = 'hoy' | 'historial' | 'creditos' | 'metas' | 'ajustes'
 
 export default function FinanceDashboard() {
   const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
+  const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
 
   const {
     isLoaded,
+    syncStatus,
     state,
     addTransaction,
     deleteTransaction,
@@ -175,6 +179,14 @@ export default function FinanceDashboard() {
             <DailyChart
               transactions={state.transactions}
               formatCurrency={formatCurrency}
+              shiftStartHour={shiftStartHour}
+            />
+
+            {/* Hourly Earnings Chart */}
+            <HourlyChart
+              transactions={state.transactions}
+              formatCurrency={formatCurrency}
+              shiftStartHour={shiftStartHour}
             />
 
             {/* Transaction History */}
@@ -184,6 +196,7 @@ export default function FinanceDashboard() {
               onEdit={editTransaction}
               formatCurrency={formatCurrency}
               accounts={state.accounts}
+              shiftStartHour={shiftStartHour}
             />
           </>
         )}
@@ -270,16 +283,37 @@ export default function FinanceDashboard() {
         )}
       </main>
 
+      {/* Cloud sync status */}
+      {syncStatus !== 'idle' && (
+        <div className={`fixed top-2 right-3 z-50 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+          syncStatus === 'saving' ? 'bg-muted text-muted-foreground' :
+          syncStatus === 'saved' ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
+          'bg-destructive/20 text-destructive'
+        }`}>
+          {syncStatus === 'saving' ? '☁ guardando…' : syncStatus === 'saved' ? '☁ guardado' : '☁ sin sync'}
+        </div>
+      )}
+
       {/* Floating Action Buttons - Only show on "Hoy" tab */}
       {activeTab === 'hoy' && (
         <FloatingActions
           onOpenSale={() => setEntryType('sale')}
           onOpenExpense={() => setEntryType('expense')}
+          onOpenQuick={() => setQuickEntryOpen(true)}
         />
       )}
 
       {/* Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Quick Entry Sheet */}
+      <QuickEntry
+        isOpen={quickEntryOpen}
+        onClose={() => setQuickEntryOpen(false)}
+        onSubmit={addTransaction}
+        currencySymbol={state.settings.currencySymbol}
+        accounts={state.accounts}
+      />
 
       {/* Service Entry Sheet - Enhanced with platform trips */}
       <ServiceEntry

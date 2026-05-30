@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, ServiceType, RidePlatform } from '@/lib/types'
+import { scheduleSave, loadFromCloud } from '@/lib/cloud-sync'
 
 const STORAGE_KEY = 'flujopro-finance-data'
 
@@ -101,20 +102,32 @@ function parseStoredData(data: string): FinanceState {
 export function useFinance() {
   const [state, setState] = useState<FinanceState>(defaultState)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
-  // Load from localStorage on mount
+  // Load from localStorage; if empty try cloud restore
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setState(parseStoredData(stored))
+      setIsLoaded(true)
+    } else {
+      loadFromCloud().then((cloudState) => {
+        if (cloudState) {
+          const parsed = parseStoredData(JSON.stringify(cloudState))
+          setState(parsed)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+        }
+        setIsLoaded(true)
+      }).catch(() => setIsLoaded(true))
     }
-    setIsLoaded(true)
   }, [])
 
-  // Save to localStorage on state change
+  // Save to localStorage + schedule cloud sync on state change
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      setSyncStatus('saving')
+      scheduleSave(state, (ok) => setSyncStatus(ok ? 'saved' : 'error'))
     }
   }, [state, isLoaded])
 
@@ -927,6 +940,7 @@ export function useFinance() {
   return {
     state,
     isLoaded,
+    syncStatus,
     addTransaction,
     deleteTransaction,
     editTransaction,

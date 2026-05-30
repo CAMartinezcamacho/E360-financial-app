@@ -2,14 +2,15 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, X, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, X, TrendingUp, TrendingDown, Zap } from 'lucide-react'
 
 interface FloatingActionsProps {
   onOpenSale: () => void
   onOpenExpense: () => void
+  onOpenQuick?: () => void
 }
 
-export function FloatingActions({ onOpenSale, onOpenExpense }: FloatingActionsProps) {
+export function FloatingActions({ onOpenSale, onOpenExpense, onOpenQuick }: FloatingActionsProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   return (
@@ -18,6 +19,23 @@ export function FloatingActions({ onOpenSale, onOpenExpense }: FloatingActionsPr
       <div className={`flex flex-col-reverse items-end gap-2 transition-all duration-300 ${
         isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
       }`}>
+        {/* Quick Trip Button */}
+        {onOpenQuick && (
+          <div className="flex items-center gap-2">
+            <span className="bg-card px-2 py-1 rounded-full text-xs font-medium shadow-lg border border-border">
+              ⚡ Viaje
+            </span>
+            <Button
+              size="icon"
+              className="w-11 h-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg active:scale-95"
+              onClick={() => { onOpenQuick(); setIsExpanded(false) }}
+            >
+              <Zap className="w-5 h-5" />
+              <span className="sr-only">Viaje rapido</span>
+            </Button>
+          </div>
+        )}
+
         {/* Sale Button */}
         <div className="flex items-center gap-2">
           <span className="bg-card px-2 py-1 rounded-full text-xs font-medium shadow-lg border border-border">
