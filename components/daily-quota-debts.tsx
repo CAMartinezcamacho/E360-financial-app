@@ -37,13 +37,13 @@ import {
   Target,
   Clock
 } from 'lucide-react'
-import type { DailyQuotaDebt } from '@/lib/types'
+import type { DailyQuotaDebt, QuotaFrequency } from '@/lib/types'
 
 interface DailyQuotaDebtsProps {
   debts: DailyQuotaDebt[]
   dailyQuotaPortion: number
-  onAdd: (name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string) => void
-  onUpdate: (id: string, name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string) => void
+  onAdd: (name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: QuotaFrequency) => void
+  onUpdate: (id: string, name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: QuotaFrequency) => void
   onDelete: (id: string) => void
   onToggleActive: (id: string) => void
   getDetails: (debt: DailyQuotaDebt) => {
@@ -79,6 +79,7 @@ export function DailyQuotaDebts({
   const [totalDays, setTotalDays] = useState('')
   const [startDate, setStartDate] = useState('')
   const [description, setDescription] = useState('')
+  const [frequency, setFrequency] = useState<QuotaFrequency>('daily')
 
   const activeDebts = debts.filter((d) => d.isActive)
   const inactiveDebts = debts.filter((d) => !d.isActive)
@@ -89,6 +90,7 @@ export function DailyQuotaDebts({
     setTotalDays('')
     setStartDate('')
     setDescription('')
+    setFrequency('daily')
   }
 
   const handleAdd = () => {
@@ -99,7 +101,8 @@ export function DailyQuotaDebts({
         parseFloat(totalAmount),
         parseInt(totalDays),
         date,
-        description.trim() || undefined
+        description.trim() || undefined,
+        frequency
       )
       resetForm()
       setIsAdding(false)
@@ -114,6 +117,7 @@ export function DailyQuotaDebts({
     const dateStr = new Date(debt.startDate).toISOString().split('T')[0]
     setStartDate(dateStr)
     setDescription(debt.description || '')
+    setFrequency(debt.frequency ?? 'daily')
   }
 
   const handleSaveEdit = () => {
@@ -125,7 +129,8 @@ export function DailyQuotaDebts({
         parseFloat(totalAmount),
         parseInt(totalDays),
         date,
-        description.trim() || undefined
+        description.trim() || undefined,
+        frequency
       )
       resetForm()
       setEditingId(null)
@@ -191,15 +196,44 @@ export function DailyQuotaDebts({
         />
       </div>
 
+      {/* Frequency toggle */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Tipo de cuota</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setFrequency('daily')}
+            className={`h-10 rounded-lg border text-sm font-medium transition-colors ${frequency === 'daily' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border text-muted-foreground'}`}
+          >
+            Diaria
+          </button>
+          <button
+            type="button"
+            onClick={() => setFrequency('weekly')}
+            className={`h-10 rounded-lg border text-sm font-medium transition-colors ${frequency === 'weekly' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border text-muted-foreground'}`}
+          >
+            Semanal
+          </button>
+        </div>
+      </div>
+
       {/* Preview calculated quota */}
       {totalAmount && totalDays && parseInt(totalDays) > 0 && (
         <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Cuota Diaria Calculada</span>
+            <span className="text-sm text-muted-foreground">{frequency === 'weekly' ? 'Cuota Semanal' : 'Cuota Diaria'}</span>
             <span className="text-lg font-bold text-accent">
               {formatCurrency(Math.ceil(parseFloat(totalAmount) / parseInt(totalDays)))}
             </span>
           </div>
+          {frequency === 'weekly' && (
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-muted-foreground">Equivalente diario</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {formatCurrency(Math.ceil(parseFloat(totalAmount) / parseInt(totalDays) / 7))} /día
+              </span>
+            </div>
+          )}
         </div>
       )}
 

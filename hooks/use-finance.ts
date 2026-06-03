@@ -580,7 +580,7 @@ export function useFinance() {
   }, [])
 
   // Daily Quota Debt management (Cuota Diaria)
-  const addDailyQuotaDebt = useCallback((name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string) => {
+  const addDailyQuotaDebt = useCallback((name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: import('@/lib/types').QuotaFrequency) => {
     const debt: DailyQuotaDebt = {
       id: crypto.randomUUID(),
       name: name.trim() || 'Cuota Diaria',
@@ -589,6 +589,7 @@ export function useFinance() {
       totalDays,
       startDate,
       isActive: true,
+      frequency: frequency ?? 'daily',
     }
     setState((prev) => ({
       ...prev,
@@ -596,11 +597,11 @@ export function useFinance() {
     }))
   }, [])
 
-  const updateDailyQuotaDebt = useCallback((id: string, name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string) => {
+  const updateDailyQuotaDebt = useCallback((id: string, name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: import('@/lib/types').QuotaFrequency) => {
     setState((prev) => ({
       ...prev,
       dailyQuotaDebts: prev.dailyQuotaDebts.map((d) =>
-        d.id === id ? { ...d, name: name.trim() || 'Cuota Diaria', totalAmount, totalDays, startDate, description } : d
+        d.id === id ? { ...d, name: name.trim() || 'Cuota Diaria', totalAmount, totalDays, startDate, description, frequency: frequency ?? d.frequency ?? 'daily' } : d
       ),
     }))
   }, [])
@@ -793,36 +794,44 @@ export function useFinance() {
       startDate.setHours(0, 0, 0, 0)
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      
+
+      const isWeekly = quota.frequency === 'weekly'
       const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-      
+      const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
+
       // Only add if still within payment period
-      if (daysPassed < quota.totalDays) {
-        dailyTotal += quota.totalAmount / quota.totalDays
+      if (periodsPassed < quota.totalDays) {
+        const dailyContribution = isWeekly
+          ? quota.totalAmount / quota.totalDays / 7
+          : quota.totalAmount / quota.totalDays
+        dailyTotal += dailyContribution
       }
     })
 
     return Math.ceil(dailyTotal)
   }, [state.dailyQuotaDebts])
 
-  // Get daily quota debt details (days passed, remaining, progress)
+  // Get quota debt details (periods passed, remaining, progress)
   const getDailyQuotaDetails = useCallback((quota: DailyQuotaDebt) => {
     const startDate = new Date(quota.startDate)
     startDate.setHours(0, 0, 0, 0)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    
+
+    const isWeekly = quota.frequency === 'weekly'
     const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const daysRemaining = Math.max(0, quota.totalDays - daysPassed)
-    const dailyQuota = quota.totalAmount / quota.totalDays
-    const amountPaid = Math.min(dailyQuota * daysPassed, quota.totalAmount)
+    const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
+    const periodsRemaining = Math.max(0, quota.totalDays - periodsPassed)
+    const quotaPerPeriod = quota.totalAmount / quota.totalDays
+    const dailyQuota = isWeekly ? quotaPerPeriod / 7 : quotaPerPeriod
+    const amountPaid = Math.min(quotaPerPeriod * periodsPassed, quota.totalAmount)
     const amountRemaining = quota.totalAmount - amountPaid
-    const progressPercent = Math.min(100, (daysPassed / quota.totalDays) * 100)
-    const isCompleted = daysPassed >= quota.totalDays
+    const progressPercent = Math.min(100, (periodsPassed / quota.totalDays) * 100)
+    const isCompleted = periodsPassed >= quota.totalDays
 
     return {
-      daysPassed: Math.max(0, daysPassed),
-      daysRemaining,
+      daysPassed: Math.max(0, periodsPassed),
+      daysRemaining: periodsRemaining,
       dailyQuota: Math.ceil(dailyQuota),
       amountPaid: Math.ceil(amountPaid),
       amountRemaining: Math.ceil(amountRemaining),

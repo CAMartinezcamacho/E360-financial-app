@@ -80,15 +80,18 @@ export interface RecurringDebt {
   isActive: boolean
 }
 
-// Daily Quota Debt (Cuota Diaria) - loans paid in daily installments
+// Daily/Weekly Quota Debt - loans paid in daily or weekly installments
+export type QuotaFrequency = 'daily' | 'weekly'
+
 export interface DailyQuotaDebt {
   id: string
   name: string // Creditor name
   description?: string
   totalAmount: number // Total borrowed amount
-  totalDays: number // Total days to pay back
+  totalDays: number // Total periods (days or weeks) to pay back
   startDate: Date
   isActive: boolean
+  frequency?: QuotaFrequency // 'daily' (default) or 'weekly'
 }
 
 export interface FinanceState {
