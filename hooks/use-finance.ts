@@ -100,13 +100,22 @@ function parseStoredData(data: string): FinanceState {
   }
 }
 
+const ONBOARDING_KEY = 'e360-onboarding-done'
+
 export function useFinance() {
   const [state, setState] = useState<FinanceState>(defaultState)
   const [isLoaded, setIsLoaded] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
   // Load from localStorage; if empty try cloud restore
   useEffect(() => {
+    const onboardingDone = localStorage.getItem(ONBOARDING_KEY)
+    if (!onboardingDone) {
+      setNeedsOnboarding(true)
+      setIsLoaded(true)
+      return
+    }
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setState(parseStoredData(stored))
@@ -121,6 +130,29 @@ export function useFinance() {
         setIsLoaded(true)
       }).catch(() => setIsLoaded(true))
     }
+  }, [])
+
+  // Called when onboarding finishes
+  const completeOnboarding = useCallback((
+    name: string,
+    currency: string,
+    nonWorkingDays: number[],
+    restoredState?: object | null
+  ) => {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+    if (restoredState) {
+      const parsed = parseStoredData(JSON.stringify(restoredState))
+      // Override name/currency with what user just entered
+      parsed.settings = { ...parsed.settings, userName: name, currencySymbol: currency, nonWorkingDays }
+      setState(parsed)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+    } else {
+      setState((prev) => ({
+        ...prev,
+        settings: { ...prev.settings, userName: name, currencySymbol: currency, nonWorkingDays },
+      }))
+    }
+    setNeedsOnboarding(false)
   }, [])
 
   // Save to localStorage + schedule cloud sync on state change
@@ -967,6 +999,8 @@ export function useFinance() {
     state,
     isLoaded,
     syncStatus,
+    needsOnboarding,
+    completeOnboarding,
     shiftStartHour,
     getShiftStart,
     currentShiftStart,

@@ -3,9 +3,22 @@
 let syncTimeout: ReturnType<typeof setTimeout> | null = null
 let isSyncing = false
 
+const SYNC_KEY_STORAGE = 'e360-sync-key'
+
+export function getSyncKey(): string {
+  if (typeof window === 'undefined') return 'default'
+  return localStorage.getItem(SYNC_KEY_STORAGE) || 'default'
+}
+
+export function setSyncKey(key: string) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(SYNC_KEY_STORAGE, key.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'default')
+}
+
 export async function saveToCloud(state: object): Promise<boolean> {
   try {
-    const res = await fetch('/api/sync', {
+    const key = getSyncKey()
+    const res = await fetch(`/api/sync?key=${encodeURIComponent(key)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
@@ -16,9 +29,10 @@ export async function saveToCloud(state: object): Promise<boolean> {
   }
 }
 
-export async function loadFromCloud(): Promise<object | null> {
+export async function loadFromCloud(key?: string): Promise<object | null> {
   try {
-    const res = await fetch('/api/sync')
+    const syncKey = key || getSyncKey()
+    const res = await fetch(`/api/sync?key=${encodeURIComponent(syncKey)}`)
     if (!res.ok) return null
     const data = await res.json()
     return data.found ? data.state : null

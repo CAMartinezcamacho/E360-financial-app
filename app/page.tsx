@@ -18,6 +18,8 @@ import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Zap, Minus } from 'lucide-react'
+import { Onboarding } from '@/components/onboarding'
+import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
 
 type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
@@ -31,6 +33,8 @@ export default function FinanceDashboard() {
     isLoaded,
     syncStatus,
     shiftStartHour,
+    needsOnboarding,
+    completeOnboarding,
     state,
     addTransaction,
     deleteTransaction,
@@ -88,6 +92,17 @@ export default function FinanceDashboard() {
     activeDailyQuotaDebts,
     todayPlatformBreakdown,
   } = useFinance()
+
+  if (needsOnboarding) {
+    return (
+      <Onboarding
+        onComplete={(name, currency, syncKey, restoredState) => {
+          setSyncKey(syncKey)
+          completeOnboarding(name, currency, [0], restoredState)
+        }}
+      />
+    )
+  }
 
   if (!isLoaded) {
     return (
