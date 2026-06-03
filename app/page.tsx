@@ -102,7 +102,13 @@ export default function FinanceDashboard() {
   }
 
   const todayTripCount = todayTransactions.filter(
-    (t) => t.type === 'sale' && !t.title.startsWith('↗ ') && !t.title.startsWith('↙ ')
+    (t) =>
+      t.type === 'sale' &&
+      !t.title.startsWith('↗ ') &&
+      !t.title.startsWith('↙ ') &&
+      !t.title.startsWith('Cobro:') &&
+      !t.title.startsWith('Ajuste:') &&
+      !t.title.startsWith('Reinicio de saldo')
   ).length
   const missing = Math.max(0, dailyTarget - todaySales)
   const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
