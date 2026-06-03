@@ -53,7 +53,7 @@ export function QuickEntry({ isOpen, onClose, onSubmit, currencySymbol, accounts
 
   const handleSubmit = () => {
     if (grossAmount <= 0) return
-    const defaultAccount = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id
+    const defaultAccount = accounts[0]?.id
     onSubmit(
       'sale',
       netAmount,

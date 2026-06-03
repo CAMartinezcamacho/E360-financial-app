@@ -2,13 +2,9 @@
 
 import { useState } from 'react'
 import { useFinance } from '@/hooks/use-finance'
-import { SurvivalHeader } from '@/components/survival-header'
-import { DailyBalance } from '@/components/daily-balance'
 import { TransactionFeed } from '@/components/transaction-feed'
 import { FixedExpenses } from '@/components/fixed-expenses'
-import { FloatingActions } from '@/components/floating-actions'
 import { ServiceEntry } from '@/components/service-entry'
-import { MonthlySummary } from '@/components/monthly-summary'
 import { BottomNav } from '@/components/bottom-nav'
 import { SettingsPanel } from '@/components/settings-panel'
 import { HistoryPanel } from '@/components/history-panel'
@@ -19,9 +15,12 @@ import { DailyQuotaDebts } from '@/components/daily-quota-debts'
 import { DailyChart } from '@/components/daily-chart'
 import { HourlyChart } from '@/components/hourly-chart'
 import { QuickEntry } from '@/components/quick-entry'
+import { MonthlySummary } from '@/components/monthly-summary'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Zap, Minus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
-type TabType = 'hoy' | 'historial' | 'creditos' | 'metas' | 'ajustes'
+type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
 
 export default function FinanceDashboard() {
   const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
@@ -46,22 +45,14 @@ export default function FinanceDashboard() {
     adjustAccountBalance,
     transferBetweenAccounts,
     resetAccountBalance,
-    // Credit management
     addCredit,
     updateCredit,
     deleteCredit,
     collectCredit,
-    // Liability management
     addLiability,
     updateLiability,
     deleteLiability,
     payLiability,
-    // Recurring debt management
-    addRecurringDebt,
-    updateRecurringDebt,
-    deleteRecurringDebt,
-    toggleRecurringDebtActive,
-    // Daily quota debt management
     addDailyQuotaDebt,
     updateDailyQuotaDebt,
     deleteDailyQuotaDebt,
@@ -70,7 +61,6 @@ export default function FinanceDashboard() {
     updateSettings,
     clearAllData,
     formatCurrency,
-    // Calculated values
     totalFixedExpenses,
     unpaidFixedExpenses,
     todayTransactions,
@@ -89,36 +79,20 @@ export default function FinanceDashboard() {
     isTodayRestDay,
     getRemainingWorkingDays,
     monthTransactions,
-    // Credits and liabilities
     totalCredits,
     totalLiabilities,
     activeCredits,
     activeLiabilities,
-    // Recurring debts
     calculateDailyDebtPortion,
-    totalMonthlyRecurringDebts,
-    activeRecurringDebts,
-    // Daily quota debts
     calculateDailyQuotaPortion,
     activeDailyQuotaDebts,
-    // Platform breakdown
     todayPlatformBreakdown,
   } = useFinance()
 
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border px-4 py-5 sticky top-0 z-40">
-          <div className="max-w-lg mx-auto space-y-3">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-5 w-12" />
-            </div>
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        </header>
-        <main className="max-w-lg mx-auto p-3 pb-20 space-y-3">
+        <main className="max-w-lg mx-auto p-3 pb-20 space-y-3 pt-6">
           <Skeleton className="h-40 w-full rounded-xl" />
           <Skeleton className="h-32 w-full rounded-xl" />
           <Skeleton className="h-48 w-full rounded-xl" />
@@ -127,43 +101,75 @@ export default function FinanceDashboard() {
     )
   }
 
+  const todayTripCount = todayTransactions.filter(
+    (t) => t.type === 'sale' && !t.title.startsWith('↗ ') && !t.title.startsWith('↙ ')
+  ).length
+  const missing = Math.max(0, dailyTarget - todaySales)
+  const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
+
   return (
     <div className="min-h-screen bg-background">
-      <SurvivalHeader
-        coveragePercent={coveragePercent}
-        shortfall={shortfall}
-        totalFixedExpenses={totalFixedExpenses}
-        unpaidFixedExpenses={unpaidFixedExpenses}
-        netIncome={netIncome}
-        dailyTarget={dailyTarget}
-        todayBalance={todayBalance}
-        userName={state.settings.userName}
-        formatCurrency={formatCurrency}
-        isTodayRestDay={isTodayRestDay}
-        remainingWorkingDays={getRemainingWorkingDays}
-        dailyDebtPortion={calculateDailyDebtPortion + calculateDailyQuotaPortion}
-      />
-
       <main className="max-w-lg mx-auto p-4 pb-24 space-y-4">
+
         {activeTab === 'hoy' && (
           <>
-            {/* Upcoming Payments Alert */}
-            <UpcomingPayments 
-              payments={upcomingPayments}
-              formatCurrency={formatCurrency}
-            />
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {isTodayRestDay
+                    ? 'Día de descanso'
+                    : `Meta diaria · ${getRemainingWorkingDays} día${getRemainingWorkingDays !== 1 ? 's' : ''} restante${getRemainingWorkingDays !== 1 ? 's' : ''}`}
+                </p>
+                <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyTarget)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
+                </p>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${progressPercent}%`,
+                    background:
+                      progressPercent >= 100 ? '#22c55e' : progressPercent >= 60 ? '#eab308' : '#ef4444',
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-muted rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">Viajes</p>
+                  <p className="text-base font-semibold">{todayTripCount}</p>
+                </div>
+                <div className="bg-muted rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">Ganado</p>
+                  <p className="text-base font-semibold text-green-500">{formatCurrency(todaySales)}</p>
+                </div>
+                <div className="bg-muted rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">Faltan</p>
+                  <p className="text-base font-semibold text-red-500">{formatCurrency(missing)}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <Button
+                  onClick={() => setQuickEntryOpen(true)}
+                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-base font-medium gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  + Viaje
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setEntryType('expense')}
+                  className="h-12 text-base font-medium gap-2"
+                >
+                  <Minus className="w-4 h-4" />
+                  Gasto
+                </Button>
+              </div>
+            </div>
 
-            {/* Daily Cash Flow Analysis with Platform Breakdown */}
-            <DailyBalance
-              todaySales={todaySales}
-              todayExpenses={todayExpenses}
-              todayBalance={todayBalance}
-              dailyTarget={dailyTarget}
-              platformBreakdown={todayPlatformBreakdown}
-              formatCurrency={formatCurrency}
-            />
+            <UpcomingPayments payments={upcomingPayments} formatCurrency={formatCurrency} />
 
-            {/* Today's Transaction Feed */}
             <TransactionFeed
               transactions={todayTransactions}
               onDelete={deleteTransaction}
@@ -176,54 +182,6 @@ export default function FinanceDashboard() {
 
         {activeTab === 'historial' && (
           <>
-            {/* Daily Sales vs Expenses Chart */}
-            <DailyChart
-              transactions={state.transactions}
-              formatCurrency={formatCurrency}
-              shiftStartHour={shiftStartHour}
-            />
-
-            {/* Hourly Earnings Chart */}
-            <HourlyChart
-              transactions={state.transactions}
-              formatCurrency={formatCurrency}
-              shiftStartHour={shiftStartHour}
-            />
-
-            {/* Transaction History */}
-            <HistoryPanel
-              transactions={state.transactions}
-              onDelete={deleteTransaction}
-              onEdit={editTransaction}
-              formatCurrency={formatCurrency}
-              accounts={state.accounts}
-              shiftStartHour={shiftStartHour}
-            />
-          </>
-        )}
-
-        {activeTab === 'creditos' && (
-          <CreditsPanel
-            credits={activeCredits}
-            liabilities={activeLiabilities}
-            accounts={state.accounts}
-            totalCredits={totalCredits}
-            totalLiabilities={totalLiabilities}
-            formatCurrency={formatCurrency}
-            onAddCredit={addCredit}
-            onUpdateCredit={updateCredit}
-            onDeleteCredit={deleteCredit}
-            onCollectCredit={collectCredit}
-            onAddLiability={addLiability}
-            onUpdateLiability={updateLiability}
-            onDeleteLiability={deleteLiability}
-            onPayLiability={payLiability}
-          />
-        )}
-
-        {activeTab === 'metas' && (
-          <>
-            {/* Monthly Summary */}
             <MonthlySummary
               monthSales={monthSales}
               monthExpenses={monthExpenses}
@@ -231,8 +189,63 @@ export default function FinanceDashboard() {
               formatCurrency={formatCurrency}
               monthTransactions={monthTransactions}
             />
+            <DailyChart
+              transactions={state.transactions}
+              formatCurrency={formatCurrency}
+            />
+            <HourlyChart
+              transactions={state.transactions}
+              formatCurrency={formatCurrency}
+              shiftStartHour={shiftStartHour}
+            />
+            <HistoryPanel
+              transactions={state.transactions}
+              onDelete={deleteTransaction}
+              onEdit={editTransaction}
+              formatCurrency={formatCurrency}
+              accounts={state.accounts}
+            />
+          </>
+        )}
 
-            {/* Account Balances */}
+        {activeTab === 'deudas' && (
+          <>
+            <FixedExpenses
+              expenses={state.fixedExpenses}
+              totalExpenses={totalFixedExpenses}
+              unpaidTotal={unpaidFixedExpenses}
+              onAdd={addFixedExpense}
+              onUpdate={updateFixedExpense}
+              onDelete={deleteFixedExpense}
+              onTogglePaid={toggleExpensePaid}
+              formatCurrency={formatCurrency}
+            />
+            <DailyQuotaDebts
+              debts={state.dailyQuotaDebts}
+              dailyQuotaPortion={calculateDailyQuotaPortion}
+              onAdd={addDailyQuotaDebt}
+              onUpdate={updateDailyQuotaDebt}
+              onDelete={deleteDailyQuotaDebt}
+              onToggleActive={toggleDailyQuotaDebtActive}
+              getDetails={getDailyQuotaDetails}
+              formatCurrency={formatCurrency}
+            />
+            <CreditsPanel
+              credits={activeCredits}
+              liabilities={activeLiabilities}
+              accounts={state.accounts}
+              totalCredits={totalCredits}
+              totalLiabilities={totalLiabilities}
+              formatCurrency={formatCurrency}
+              onAddCredit={addCredit}
+              onUpdateCredit={updateCredit}
+              onDeleteCredit={deleteCredit}
+              onCollectCredit={collectCredit}
+              onAddLiability={addLiability}
+              onUpdateLiability={updateLiability}
+              onDeleteLiability={deleteLiability}
+              onPayLiability={payLiability}
+            />
             <AccountBalances
               accounts={state.accounts}
               balances={accountBalances}
@@ -246,35 +259,11 @@ export default function FinanceDashboard() {
               onResetBalance={resetAccountBalance}
               formatCurrency={formatCurrency}
             />
-
-            {/* Fixed Expenses Configuration */}
-            <FixedExpenses
-              expenses={state.fixedExpenses}
-              totalExpenses={totalFixedExpenses}
-              unpaidTotal={unpaidFixedExpenses}
-              onAdd={addFixedExpense}
-              onUpdate={updateFixedExpense}
-              onDelete={deleteFixedExpense}
-              onTogglePaid={toggleExpensePaid}
-              formatCurrency={formatCurrency}
-            />
-
-            {/* Daily Quota Debts - Cuotas Diarias */}
-            <DailyQuotaDebts
-              debts={state.dailyQuotaDebts}
-              dailyQuotaPortion={calculateDailyQuotaPortion}
-              onAdd={addDailyQuotaDebt}
-              onUpdate={updateDailyQuotaDebt}
-              onDelete={deleteDailyQuotaDebt}
-              onToggleActive={toggleDailyQuotaDebtActive}
-              getDetails={getDailyQuotaDetails}
-              formatCurrency={formatCurrency}
-            />
           </>
         )}
 
         {activeTab === 'ajustes' && (
-          <SettingsPanel 
+          <SettingsPanel
             settings={state.settings}
             onUpdateSettings={updateSettings}
             onClearData={clearAllData}
@@ -284,30 +273,22 @@ export default function FinanceDashboard() {
         )}
       </main>
 
-      {/* Cloud sync status */}
       {syncStatus !== 'idle' && (
-        <div className={`fixed top-2 right-3 z-50 text-[10px] px-2 py-0.5 rounded-full font-medium ${
-          syncStatus === 'saving' ? 'bg-muted text-muted-foreground' :
-          syncStatus === 'saved' ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
-          'bg-destructive/20 text-destructive'
-        }`}>
+        <div
+          className={`fixed top-2 right-3 z-50 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+            syncStatus === 'saving'
+              ? 'bg-muted text-muted-foreground'
+              : syncStatus === 'saved'
+              ? 'bg-green-500/20 text-green-700 dark:text-green-400'
+              : 'bg-destructive/20 text-destructive'
+          }`}
+        >
           {syncStatus === 'saving' ? '☁ guardando…' : syncStatus === 'saved' ? '☁ guardado' : '☁ sin sync'}
         </div>
       )}
 
-      {/* Floating Action Buttons - Only show on "Hoy" tab */}
-      {activeTab === 'hoy' && (
-        <FloatingActions
-          onOpenSale={() => setEntryType('sale')}
-          onOpenExpense={() => setEntryType('expense')}
-          onOpenQuick={() => setQuickEntryOpen(true)}
-        />
-      )}
-
-      {/* Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Quick Entry Sheet */}
       <QuickEntry
         isOpen={quickEntryOpen}
         onClose={() => setQuickEntryOpen(false)}
@@ -316,7 +297,6 @@ export default function FinanceDashboard() {
         accounts={state.accounts}
       />
 
-      {/* Service Entry Sheet - Enhanced with platform trips */}
       <ServiceEntry
         isOpen={entryType !== null}
         type={entryType}

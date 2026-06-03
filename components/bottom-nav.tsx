@@ -1,8 +1,8 @@
 'use client'
 
-import { CalendarDays, Target, Settings, History, Wallet } from 'lucide-react'
+import { CalendarDays, Settings, History, CreditCard } from 'lucide-react'
 
-type TabType = 'hoy' | 'historial' | 'creditos' | 'metas' | 'ajustes'
+type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
 
 interface BottomNavProps {
   activeTab: TabType
@@ -13,8 +13,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const tabs: { id: TabType; label: string; icon: typeof CalendarDays }[] = [
     { id: 'hoy', label: 'Hoy', icon: CalendarDays },
     { id: 'historial', label: 'Historial', icon: History },
-    { id: 'creditos', label: 'Creditos', icon: Wallet },
-    { id: 'metas', label: 'Metas', icon: Target },
+    { id: 'deudas', label: 'Deudas', icon: CreditCard },
     { id: 'ajustes', label: 'Ajustes', icon: Settings },
   ]
 
@@ -24,14 +23,14 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
-          
+
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`flex flex-col items-center justify-center gap-1 w-full h-full min-h-[44px] transition-colors active:scale-95 ${
-                isActive 
-                  ? 'text-accent' 
+                isActive
+                  ? 'text-accent'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
