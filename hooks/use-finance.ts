@@ -1179,6 +1179,7 @@ export function useFinance() {
     activeDailyQuotaDebts: state.dailyQuotaDebts.filter((d) => d.isActive),
     // Platform breakdown
     todayPlatformBreakdown,
+    baseShortfallDaily,
     // Debt plans
     addDebtPlan,
     updateDebtPlan,

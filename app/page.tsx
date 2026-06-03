@@ -18,7 +18,7 @@ import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
 import { DebtPlans } from '@/components/debt-plans'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Zap, Minus } from 'lucide-react'
+import { Zap, Minus, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,7 @@ export default function FinanceDashboard() {
   const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   const {
     isLoaded,
@@ -89,6 +90,7 @@ export default function FinanceDashboard() {
     activeCredits,
     activeLiabilities,
     calculateDailyDebtPortion,
+    baseShortfallDaily,
     addDebtPlan,
     updateDebtPlan,
     deleteDebtPlan,
@@ -133,6 +135,7 @@ export default function FinanceDashboard() {
       !t.title.startsWith('Ajuste:') &&
       !t.title.startsWith('Reinicio de saldo')
   ).length
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
   const missing = Math.max(0, dailyTarget - todaySales)
   const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
 
@@ -143,17 +146,25 @@ export default function FinanceDashboard() {
         {activeTab === 'hoy' && (
           <>
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  {isTodayRestDay
-                    ? 'Día de descanso'
-                    : `Meta diaria · ${getRemainingWorkingDays} día${getRemainingWorkingDays !== 1 ? 's' : ''} restante${getRemainingWorkingDays !== 1 ? 's' : ''}`}
-                </p>
-                <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyTarget)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
-                </p>
-              </div>
+              <button className="w-full text-left" onClick={() => setShowBreakdown((v) => !v)}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {isTodayRestDay
+                        ? 'Día de descanso'
+                        : `Meta diaria · ${getRemainingWorkingDays} día${getRemainingWorkingDays !== 1 ? 's' : ''} restante${getRemainingWorkingDays !== 1 ? 's' : ''}`}
+                    </p>
+                    <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyTarget)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                    <Info className="w-3.5 h-3.5" />
+                    {showBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </div>
+                </div>
+              </button>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
@@ -164,6 +175,44 @@ export default function FinanceDashboard() {
                   }}
                 />
               </div>
+              {showBreakdown && (
+                <div className="rounded-xl bg-muted/60 border border-border divide-y divide-border text-xs overflow-hidden">
+                  {/* Fixed expenses shortfall */}
+                  {baseShortfallDaily > 0 && (
+                    <div className="flex justify-between items-center px-3 py-2">
+                      <span className="text-muted-foreground">Gastos fijos (saldo pendiente)</span>
+                      <span className="font-semibold">{formatCurrency(baseShortfallDaily)}</span>
+                    </div>
+                  )}
+                  {/* Debt plans */}
+                  {debtPlans.filter(p => p.isActive && p.remainingAmount > 0).map(p => {
+                    const divisors: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: daysInMonth }
+                    const daily = Math.ceil(p.paymentAmount / (divisors[p.frequency] || 30))
+                    return (
+                      <div key={p.id} className="flex justify-between items-center px-3 py-2">
+                        <span className="text-muted-foreground truncate max-w-[60%]">Abono: {p.name}</span>
+                        <span className="font-semibold">{formatCurrency(daily)}</span>
+                      </div>
+                    )
+                  })}
+                  {/* Daily quota debts */}
+                  {activeDailyQuotaDebts.filter(q => q.isActive).map(q => {
+                    const isWeekly = q.frequency === 'weekly'
+                    const daily = Math.ceil(q.totalAmount / q.totalDays / (isWeekly ? 7 : 1))
+                    return (
+                      <div key={q.id} className="flex justify-between items-center px-3 py-2">
+                        <span className="text-muted-foreground truncate max-w-[60%]">Cuota: {q.name}</span>
+                        <span className="font-semibold">{formatCurrency(daily)}</span>
+                      </div>
+                    )
+                  })}
+                  {/* Total */}
+                  <div className="flex justify-between items-center px-3 py-2 bg-muted">
+                    <span className="font-semibold">Total meta</span>
+                    <span className="font-bold text-primary">{formatCurrency(dailyTarget)}</span>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-[10px] text-muted-foreground">Viajes</p>
