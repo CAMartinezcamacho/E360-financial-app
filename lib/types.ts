@@ -93,6 +93,20 @@ export interface DailyQuotaDebt {
   isActive: boolean
   frequency?: QuotaFrequency // 'daily' (default) or 'weekly'
 }
+// Unified debt plan: total debt + periodic payment + progress tracking
+export interface DebtPlan {
+  id: string
+  name: string                // Who you owe (e.g., "Mamá", "Banco")
+  description?: string
+  totalAmount: number         // Original total debt
+  remainingAmount: number     // Current remaining balance
+  paymentAmount: number       // Amount per payment period
+  frequency: PaymentFrequency // How often you pay
+  dueDay?: number             // Day of month (1-31) the payment is due
+  startDate: Date
+  isActive: boolean
+  paidMonth?: string          // "YYYY-MM" — tracks if this month's payment is done
+}
 
 export interface FinanceState {
   transactions: Transaction[]
@@ -101,7 +115,8 @@ export interface FinanceState {
   settings: UserSettings
   accounts: Account[]
   credits: Credit[] // "Me Deben"
-  liabilities: Liability[] // "Debo"
-  recurringDebts: RecurringDebt[] // Deudas recurrentes con prorrateo diario
+  liabilities: Liability[] // (legacy — kept for data migration)
+  recurringDebts: RecurringDebt[] // (legacy — kept for data migration)
   dailyQuotaDebts: DailyQuotaDebt[] // Cuotas diarias (gota a gota)
+  debtPlans: DebtPlan[] // Deudas con abono periódico
 }

@@ -16,6 +16,7 @@ import { DailyChart } from '@/components/daily-chart'
 import { HourlyChart } from '@/components/hourly-chart'
 import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
+import { DebtPlans } from '@/components/debt-plans'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Zap, Minus } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
@@ -88,6 +89,13 @@ export default function FinanceDashboard() {
     activeCredits,
     activeLiabilities,
     calculateDailyDebtPortion,
+    addDebtPlan,
+    updateDebtPlan,
+    deleteDebtPlan,
+    toggleDebtPlanActive,
+    payDebtPlan,
+    calculateDebtPlanDailyPortion,
+    debtPlans,
     calculateDailyQuotaPortion,
     activeDailyQuotaDebts,
     todayPlatformBreakdown,
@@ -239,6 +247,16 @@ export default function FinanceDashboard() {
               onUpdate={updateFixedExpense}
               onDelete={deleteFixedExpense}
               onTogglePaid={toggleExpensePaid}
+              formatCurrency={formatCurrency}
+            />
+            <DebtPlans
+              plans={debtPlans}
+              dailyPortion={calculateDebtPlanDailyPortion}
+              onAdd={addDebtPlan}
+              onUpdate={updateDebtPlan}
+              onDelete={deleteDebtPlan}
+              onToggleActive={toggleDebtPlanActive}
+              onPay={payDebtPlan}
               formatCurrency={formatCurrency}
             />
             <DailyQuotaDebts

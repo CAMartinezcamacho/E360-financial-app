@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, ServiceType, RidePlatform } from '@/lib/types'
+import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, DebtPlan, ServiceType, RidePlatform } from '@/lib/types'
 import { scheduleSave, loadFromCloud } from '@/lib/cloud-sync'
 
 const STORAGE_KEY = 'flujopro-finance-data'
@@ -37,6 +37,7 @@ const defaultState: FinanceState = {
   liabilities: [],
   recurringDebts: [],
   dailyQuotaDebts: [],
+  debtPlans: [],
 }
 
 function parseStoredData(data: string): FinanceState {
@@ -91,6 +92,11 @@ function parseStoredData(data: string): FinanceState {
       })),
       // Parse daily quota debts
       dailyQuotaDebts: (parsed.dailyQuotaDebts || []).map((d: DailyQuotaDebt) => ({
+        ...d,
+        startDate: new Date(d.startDate),
+      })),
+      // Parse debt plans
+      debtPlans: (parsed.debtPlans || []).map((d: DebtPlan) => ({
         ...d,
         startDate: new Date(d.startDate),
       })),
@@ -654,6 +660,74 @@ export function useFinance() {
     }))
   }, [])
 
+
+  // ── DebtPlan management ──────────────────────────────────────────────
+  const addDebtPlan = useCallback((
+    name: string, totalAmount: number, paymentAmount: number,
+    frequency: PaymentFrequency, dueDay?: number, description?: string
+  ) => {
+    const plan: DebtPlan = {
+      id: crypto.randomUUID(),
+      name: name.trim() || 'Deuda',
+      description,
+      totalAmount,
+      remainingAmount: totalAmount,
+      paymentAmount,
+      frequency,
+      dueDay,
+      startDate: new Date(),
+      isActive: true,
+    }
+    setState((prev) => ({ ...prev, debtPlans: [plan, ...prev.debtPlans] }))
+  }, [])
+
+  const updateDebtPlan = useCallback((
+    id: string, name: string, totalAmount: number, paymentAmount: number,
+    frequency: PaymentFrequency, dueDay?: number, description?: string
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      debtPlans: prev.debtPlans.map((p) =>
+        p.id === id ? { ...p, name: name.trim() || 'Deuda', totalAmount, paymentAmount, frequency, dueDay, description } : p
+      ),
+    }))
+  }, [])
+
+  const deleteDebtPlan = useCallback((id: string) => {
+    setState((prev) => ({ ...prev, debtPlans: prev.debtPlans.filter((p) => p.id !== id) }))
+  }, [])
+
+  const toggleDebtPlanActive = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      debtPlans: prev.debtPlans.map((p) => p.id === id ? { ...p, isActive: !p.isActive } : p),
+    }))
+  }, [])
+
+  const payDebtPlan = useCallback((id: string, addAsExpense = true, accountId?: string) => {
+    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    setState((prev) => {
+      const plan = prev.debtPlans.find((p) => p.id === id)
+      if (!plan) return prev
+      const newRemaining = Math.max(0, plan.remainingAmount - plan.paymentAmount)
+      const updatedPlans = prev.debtPlans.map((p) =>
+        p.id === id ? { ...p, remainingAmount: newRemaining, paidMonth: currentMonth } : p
+      )
+      const newTransactions = addAsExpense ? [
+        {
+          id: crypto.randomUUID(),
+          type: 'expense' as const,
+          amount: plan.paymentAmount,
+          title: `Abono: ${plan.name}`,
+          timestamp: new Date(),
+          accountId,
+        },
+        ...prev.transactions,
+      ] : prev.transactions
+      return { ...prev, debtPlans: updatedPlans, transactions: newTransactions }
+    })
+  }, [])
+
   const clearAllData = useCallback(() => {
     setState(defaultState)
     localStorage.removeItem(STORAGE_KEY)
@@ -897,13 +971,42 @@ export function useFinance() {
     return Math.ceil(monthlyTotal)
   }, [state.recurringDebts, daysInMonth])
 
+
+  // Daily contribution from DebtPlans
+  const calculateDebtPlanDailyPortion = useMemo(() => {
+    const active = state.debtPlans.filter((p) => p.isActive && p.remainingAmount > 0)
+    let total = 0
+    active.forEach((p) => {
+      switch (p.frequency) {
+        case 'daily':    total += p.paymentAmount; break
+        case 'weekly':   total += p.paymentAmount / 7; break
+        case 'biweekly': total += p.paymentAmount / 14; break
+        case 'monthly':  total += p.paymentAmount / daysInMonth; break
+      }
+    })
+    return Math.ceil(total)
+  }, [state.debtPlans, daysInMonth])
+
+  // Upcoming debt plan payments
+  const upcomingDebtPayments = useMemo(() => {
+    const currentDay = currentDate.getDate()
+    const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+    return state.debtPlans
+      .filter((p) => p.isActive && p.remainingAmount > 0 && p.dueDay && p.paidMonth !== currentMonth)
+      .map((p) => {
+        const daysUntil = (p.dueDay ?? 0) - currentDay
+        return { ...p, daysUntil }
+      })
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+  }, [state.debtPlans, currentDate])
+
   // Daily target now includes: base shortfall proration + daily debt portion
   const baseShortfallDaily = shortfall > 0 && getRemainingWorkingDays > 0 
     ? Math.ceil(shortfall / getRemainingWorkingDays) 
     : 0
   
   // Final daily target = base + recurring debts daily portion + daily quota portion
-  const dailyTarget = baseShortfallDaily + calculateDailyDebtPortion + calculateDailyQuotaPortion
+  const dailyTarget = baseShortfallDaily + calculateDailyDebtPortion + calculateDailyQuotaPortion + calculateDebtPlanDailyPortion
 
   // Calculate account balances with income/expense breakdown
   const accountBalances = useMemo(() => {
@@ -1076,5 +1179,14 @@ export function useFinance() {
     activeDailyQuotaDebts: state.dailyQuotaDebts.filter((d) => d.isActive),
     // Platform breakdown
     todayPlatformBreakdown,
+    // Debt plans
+    addDebtPlan,
+    updateDebtPlan,
+    deleteDebtPlan,
+    toggleDebtPlanActive,
+    payDebtPlan,
+    calculateDebtPlanDailyPortion,
+    upcomingDebtPayments,
+    debtPlans: state.debtPlans,
   }
 }
