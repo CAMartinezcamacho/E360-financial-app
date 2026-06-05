@@ -18,10 +18,10 @@ import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
 import { DebtPlans } from '@/components/debt-plans'
 import { ShiftSummaryModal } from '@/components/shift-summary'
-import { TripFAB } from '@/components/trip-fab'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
+import { useNotifications } from '@/hooks/use-notifications'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
 import {
@@ -133,6 +133,12 @@ export default function FinanceDashboard() {
     startShift,
     endShift,
   } = useFinance()
+
+  useNotifications({
+    isShiftActive,
+    enabled: state.settings.notificationsEnabled ?? false,
+    intervalMinutes: state.settings.notificationInterval ?? 30,
+  })
 
   if (needsOnboarding) {
     return (
@@ -469,13 +475,6 @@ export default function FinanceDashboard() {
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {activeTab !== 'ajustes' && (
-        <TripFAB
-          isShiftActive={isShiftActive}
-          tripCount={todayTripCount}
-          onPress={() => setEntryType('sale')}
-        />
-      )}
 
       <QuickEntry
         isOpen={quickEntryOpen}

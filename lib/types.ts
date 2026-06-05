@@ -40,6 +40,8 @@ export interface UserSettings {
   currencySymbol: string
   nonWorkingDays: number[] // 0=Sunday, 1=Monday, etc.
   shiftStartHour: number // Hour (0-23) when work shift starts. Default 0 = midnight.
+  notificationsEnabled: boolean
+  notificationInterval: number // minutes between reminders: 15, 30, 45, 60
 }
 
 // "Me Deben" - Money others owe to me

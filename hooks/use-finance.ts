@@ -11,6 +11,8 @@ const defaultSettings: UserSettings = {
   currencySymbol: '$',
   nonWorkingDays: [0], // Sunday by default
   shiftStartHour: 0,
+  notificationsEnabled: false,
+  notificationInterval: 30,
 }
 
 const defaultAccounts: Account[] = [

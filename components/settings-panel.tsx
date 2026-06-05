@@ -6,16 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  Download, 
-  Smartphone, 
-  Trash2, 
-  AlertTriangle, 
-  User, 
+import {
+  Download,
+  Smartphone,
+  Trash2,
+  AlertTriangle,
+  User,
   Coins,
   Check,
   FileSpreadsheet,
-  CalendarDays
+  CalendarDays,
+  Bell,
 } from 'lucide-react'
 import { downloadReport } from '@/lib/export'
 import type { Transaction, FixedExpense } from '@/lib/types'
@@ -88,6 +89,13 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
   const [customCurrency, setCustomCurrency] = useState('')
   const [showCustomCurrency, setShowCustomCurrency] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifPermission(Notification.permission)
+    }
+  }, [])
 
   const nonWorkingDays = settings.nonWorkingDays || []
 
@@ -159,6 +167,21 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
 
   const handleExport = () => {
     downloadReport(transactions, fixedExpenses, settings.currencySymbol)
+  }
+
+  const handleToggleNotifications = async () => {
+    if (settings.notificationsEnabled) {
+      onUpdateSettings({ notificationsEnabled: false })
+      return
+    }
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (notifPermission === 'denied') return
+    if (notifPermission === 'default') {
+      const result = await Notification.requestPermission()
+      setNotifPermission(result)
+      if (result !== 'granted') return
+    }
+    onUpdateSettings({ notificationsEnabled: true })
   }
 
   const toggleNonWorkingDay = (day: number) => {
@@ -257,6 +280,78 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Tu meta diaria se divide entre estos dias para que puedas descansar sin perder el ritmo.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recordatorios */}
+      <Card className="border-0 shadow-sm bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Recordatorios de Viaje
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Recibe una notificación periódica mientras trabajas para recordarte apuntar cada servicio. Cada viaje registrado es dinero que controlas.
+          </p>
+
+          {/* Toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-foreground">Activar recordatorios</span>
+            <button
+              onClick={handleToggleNotifications}
+              disabled={notifPermission === 'denied'}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                settings.notificationsEnabled && notifPermission === 'granted'
+                  ? 'bg-accent'
+                  : 'bg-muted'
+              } disabled:opacity-40`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  settings.notificationsEnabled && notifPermission === 'granted'
+                    ? 'translate-x-5'
+                    : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Permission denied warning */}
+          {notifPermission === 'denied' && (
+            <p className="text-xs text-destructive">
+              Los permisos de notificación están bloqueados. Actívalos desde la configuración del navegador o la app.
+            </p>
+          )}
+
+          {/* Interval selector */}
+          {settings.notificationsEnabled && notifPermission === 'granted' && (
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Recordar cada</Label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[15, 30, 45, 60].map((min) => (
+                  <button
+                    key={min}
+                    onClick={() => onUpdateSettings({ notificationInterval: min })}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      (settings.notificationInterval ?? 30) === min
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {min} min
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 rounded-xl bg-secondary/50 border border-border">
+            <p className="text-xs text-muted-foreground">
+              Los recordatorios funcionan mientras la app está abierta o en segundo plano. Fija la app en tu pantalla para mantenerla activa mientras conduces.
             </p>
           </div>
         </CardContent>
