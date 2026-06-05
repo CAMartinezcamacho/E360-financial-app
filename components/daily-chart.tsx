@@ -11,7 +11,6 @@ import {
   CartesianGrid,
   ReferenceLine,
   Tooltip,
-  ResponsiveContainer,
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Calendar } from 'lucide-react'
@@ -38,6 +37,13 @@ const isInternalTransaction = (title: string) =>
   title.startsWith('Reinicio de saldo') ||
   title.startsWith('Ajuste:')
 
+const compactValue = (v: number) => {
+  if (v === 0) return ''
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+  return String(Math.round(v))
+}
+
 const chartConfig = {
   sales: { label: 'Ventas', color: '#22c55e' },
   expenses: { label: 'Gastos', color: '#ef4444' },
@@ -52,14 +58,12 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
   const currentDay = today.getDate()
   const currentMonth = today.getMonth()
   const currentYear = today.getFullYear()
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
 
   const dailyData = useMemo(() => {
     const monthTxns = transactions.filter((t) => {
       const d = new Date(t.timestamp)
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear
     })
-
     const data: DailyData[] = []
     for (let day = 1; day <= currentDay; day++) {
       const dayTxns = monthTxns.filter((t) => new Date(t.timestamp).getDate() === day)
@@ -88,16 +92,44 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
     const totalExpenses = dailyData.reduce((s, d) => s + d.expenses, 0)
     const avgSales = daysWithData.length > 0 ? totalSales / daysWithData.length : 0
     const avgExpenses = daysWithData.length > 0 ? totalExpenses / daysWithData.length : 0
-    const bestDay = [...dailyData].sort((a, b) => b.net - a.net)[0]
-    const worstDay = daysWithData.length > 0
-      ? [...daysWithData].sort((a, b) => a.net - b.net)[0]
-      : dailyData[0]
-    return { totalSales, totalExpenses, avgSales, avgExpenses, bestDay, worstDay, daysWithData: daysWithData.length }
+    const best = [...dailyData].sort((a, b) => b.net - a.net)[0]
+    const worst = daysWithData.length > 0 ? [...daysWithData].sort((a, b) => a.net - b.net)[0] : dailyData[0]
+    return { totalSales, totalExpenses, avgSales, avgExpenses, bestDay: best, worstDay: worst, daysWithData: daysWithData.length }
   }, [dailyData])
+
+  const totalPoints = dailyData.length
+  // Show label every N points to avoid clutter
+  const labelEvery = totalPoints <= 10 ? 1 : totalPoints <= 20 ? 2 : 3
+
+  // Custom dot renderer — shows a marker + value label above the dot
+  const makeDot = (color: string, labelOffset = 10) =>
+    ({ cx, cy, value, index, payload }: { cx?: number; cy?: number; value?: number; index?: number; payload?: DailyData }) => {
+      if (cx === undefined || cy === undefined || index === undefined) return <g key={`d-${index}`} />
+      const isToday = payload?.isToday ?? false
+      const r = isToday ? 5 : 3
+      const showLabel = (value ?? 0) > 0 && (index % labelEvery === 0 || isToday)
+      return (
+        <g key={`dot-${color}-${index}`}>
+          <circle cx={cx} cy={cy} r={r} fill={color} stroke={isToday ? '#fff' : 'none'} strokeWidth={isToday ? 1.5 : 0} />
+          {showLabel && (
+            <text
+              x={cx}
+              y={cy - labelOffset}
+              textAnchor="middle"
+              fontSize={8}
+              fontWeight="700"
+              fill={color}
+            >
+              {compactValue(value ?? 0)}
+            </text>
+          )}
+        </g>
+      )
+    }
 
   const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string }) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) => {
     if (!active || !payload?.length) return null
     const dayData = dailyData.find((d) => d.dayLabel === label)
     if (!dayData) return null
@@ -136,7 +168,7 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
     )
   }
 
-  const tickInterval = Math.max(1, Math.floor(currentDay / 6))
+  const tickInterval = Math.max(0, Math.ceil(totalPoints / 8) - 1)
 
   return (
     <Card className="border-border/50">
@@ -174,17 +206,19 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
             </Button>
           </div>
 
-          <div className="h-52 w-full">
+          {/* Extra top padding so labels above dots don't get clipped */}
+          <div className="h-60 w-full">
             <ChartContainer config={chartConfig} className="h-full w-full">
-              <LineChart data={dailyData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+              <LineChart data={dailyData} margin={{ top: 18, right: 8, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
                 <XAxis
                   dataKey="dayLabel"
                   tick={{ fontSize: 9 }}
                   tickLine={false}
                   axisLine={false}
-                  interval={tickInterval - 1}
+                  interval={tickInterval}
                   height={20}
+                  label={{ value: 'Días', position: 'insideBottomRight', offset: -4, fontSize: 9, fill: '#9ca3af' }}
                 />
                 <YAxis
                   tick={{ fontSize: 8 }}
@@ -194,6 +228,7 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                   width={35}
                 />
                 <Tooltip content={<CustomTooltip />} />
+
                 {viewMode === 'comparison' ? (
                   <>
                     <Line
@@ -201,16 +236,18 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                       dataKey="sales"
                       stroke="#22c55e"
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, fill: '#22c55e' }}
+                      dot={makeDot('#22c55e', 11)}
+                      activeDot={{ r: 6, fill: '#22c55e' }}
+                      isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
                       dataKey="expenses"
                       stroke="#ef4444"
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, fill: '#ef4444' }}
+                      dot={makeDot('#ef4444', 11)}
+                      activeDot={{ r: 6, fill: '#ef4444' }}
+                      isAnimationActive={false}
                     />
                   </>
                 ) : (
@@ -221,8 +258,9 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
                       dataKey="net"
                       stroke="#3b82f6"
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, fill: '#3b82f6' }}
+                      dot={makeDot('#3b82f6', 11)}
+                      activeDot={{ r: 6, fill: '#3b82f6' }}
+                      isAnimationActive={false}
                     />
                   </>
                 )}
@@ -231,13 +269,13 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
           </div>
 
           {viewMode === 'comparison' && (
-            <div className="flex items-center justify-center gap-4 text-[10px]">
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-0.5 rounded-full bg-green-500" />
+            <div className="flex items-center justify-center gap-5 text-[10px]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-0.5 bg-green-500 rounded-full" />
                 <span className="text-muted-foreground">Ventas</span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-0.5 rounded-full bg-red-500" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-0.5 bg-red-500 rounded-full" />
                 <span className="text-muted-foreground">Gastos</span>
               </div>
             </div>
