@@ -18,6 +18,7 @@ import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
 import { DebtPlans } from '@/components/debt-plans'
 import { ShiftSummaryModal } from '@/components/shift-summary'
+import { TripFAB } from '@/components/trip-fab'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
@@ -50,7 +51,7 @@ function ElapsedTime({ startTime }: { startTime: Date }) {
 }
 
 export default function FinanceDashboard() {
-  const [entryType, setEntryType] = useState<'expense' | null>(null)
+  const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
   const [showBreakdown, setShowBreakdown] = useState(false)
@@ -467,6 +468,14 @@ export default function FinanceDashboard() {
       )}
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {activeTab !== 'ajustes' && (
+        <TripFAB
+          isShiftActive={isShiftActive}
+          tripCount={todayTripCount}
+          onPress={() => setEntryType('sale')}
+        />
+      )}
 
       <QuickEntry
         isOpen={quickEntryOpen}
