@@ -1061,13 +1061,47 @@ export function useFinance() {
       .sort((a, b) => a.daysUntil - b.daysUntil)
   }, [state.debtPlans, currentDate])
 
-  // Daily target now includes: base shortfall proration + daily debt portion
-  const baseShortfallDaily = shortfall > 0 && getRemainingWorkingDays > 0 
-    ? Math.ceil(shortfall / getRemainingWorkingDays) 
+  // ROLLOVER: full quota amount owed for each non-expired active quota
+  const quotaObligationsTotal = useMemo(() => {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    return state.dailyQuotaDebts.filter((q) => q.isActive).reduce((sum, q) => {
+      const start = new Date(q.startDate)
+      start.setHours(0, 0, 0, 0)
+      const isWeekly = q.frequency === 'weekly'
+      const daysPassed = Math.floor((todayStart.getTime() - start.getTime()) / 86400000)
+      const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
+      if (periodsPassed >= q.totalDays) return sum
+      return sum + q.totalAmount
+    }, 0)
+  }, [state.dailyQuotaDebts])
+
+  // ROLLOVER: what's still owed this month for each active debt plan
+  const debtPlanObligationsTotal = useMemo(() => {
+    const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+    return state.debtPlans.filter((p) => p.isActive && p.remainingAmount > 0).reduce((sum, p) => {
+      let monthly: number
+      switch (p.frequency) {
+        case 'monthly':  monthly = p.paidMonth === currentMonthStr ? 0 : p.paymentAmount; break
+        case 'weekly':   monthly = p.paymentAmount * (daysInMonth / 7); break
+        case 'biweekly': monthly = p.paymentAmount * (daysInMonth / 14); break
+        case 'daily':    monthly = p.paymentAmount * daysInMonth; break
+        default:         monthly = p.paymentAmount
+      }
+      return sum + Math.min(Math.ceil(monthly), p.remainingAmount)
+    }, 0)
+  }, [state.debtPlans, currentDate, daysInMonth])
+
+  // ROLLOVER: unified total remaining obligation vs actual income earned
+  // When income is low one day, tomorrow's target automatically rises to compensate
+  const totalRemainingObligation = unpaidFixedExpenses + totalMonthlyRecurringDebts + quotaObligationsTotal + debtPlanObligationsTotal
+  const totalShortfall = Math.max(0, totalRemainingObligation - netIncome)
+  const dailyTarget = getRemainingWorkingDays > 0 ? Math.ceil(totalShortfall / getRemainingWorkingDays) : 0
+
+  // Raw daily for fixed expenses (used in breakdown display, before income offset)
+  const baseShortfallDaily = getRemainingWorkingDays > 0 && unpaidFixedExpenses > 0
+    ? Math.ceil(unpaidFixedExpenses / getRemainingWorkingDays)
     : 0
-  
-  // Final daily target = base + recurring debts daily portion + daily quota portion
-  const dailyTarget = baseShortfallDaily + calculateDailyDebtPortion + calculateDailyQuotaPortion + calculateDebtPlanDailyPortion
 
   // Calculate account balances with income/expense breakdown
   const accountBalances = useMemo(() => {
@@ -1241,6 +1275,8 @@ export function useFinance() {
     // Platform breakdown
     todayPlatformBreakdown,
     baseShortfallDaily,
+    quotaObligationsTotal,
+    debtPlanObligationsTotal,
     // Debt plans
     addDebtPlan,
     updateDebtPlan,

@@ -117,6 +117,7 @@ export default function FinanceDashboard() {
     activeLiabilities,
     calculateDailyDebtPortion,
     baseShortfallDaily,
+    totalMonthlyRecurringDebts,
     addDebtPlan,
     updateDebtPlan,
     deleteDebtPlan,
@@ -165,6 +166,8 @@ export default function FinanceDashboard() {
       !t.title.startsWith('Reinicio de saldo')
   ).length
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
+  const currentMonthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  const breakdownTodayStart = new Date(); breakdownTodayStart.setHours(0, 0, 0, 0)
   const missing = Math.max(0, dailyTarget - todaySales)
   const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
 
@@ -246,13 +249,28 @@ export default function FinanceDashboard() {
                 <div className="rounded-xl bg-muted/60 border border-border divide-y divide-border text-xs overflow-hidden">
                   {baseShortfallDaily > 0 && (
                     <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-muted-foreground">Gastos fijos (saldo pendiente)</span>
+                      <span className="text-muted-foreground">Gastos fijos</span>
                       <span className="font-semibold">{formatCurrency(baseShortfallDaily)}</span>
                     </div>
                   )}
+                  {totalMonthlyRecurringDebts > 0 && getRemainingWorkingDays > 0 && (
+                    <div className="flex justify-between items-center px-3 py-2">
+                      <span className="text-muted-foreground">Deudas recurrentes</span>
+                      <span className="font-semibold">{formatCurrency(Math.ceil(totalMonthlyRecurringDebts / getRemainingWorkingDays))}</span>
+                    </div>
+                  )}
                   {debtPlans.filter(p => p.isActive && p.remainingAmount > 0).map(p => {
-                    const divisors: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: daysInMonth }
-                    const daily = Math.ceil(p.paymentAmount / (divisors[p.frequency] || 30))
+                    let monthly: number
+                    switch (p.frequency) {
+                      case 'monthly':  monthly = p.paidMonth === currentMonthStr ? 0 : p.paymentAmount; break
+                      case 'weekly':   monthly = p.paymentAmount * (daysInMonth / 7); break
+                      case 'biweekly': monthly = p.paymentAmount * (daysInMonth / 14); break
+                      case 'daily':    monthly = p.paymentAmount * daysInMonth; break
+                      default:         monthly = p.paymentAmount
+                    }
+                    const obligation = Math.min(Math.ceil(monthly), p.remainingAmount)
+                    const daily = getRemainingWorkingDays > 0 ? Math.ceil(obligation / getRemainingWorkingDays) : 0
+                    if (daily === 0) return null
                     return (
                       <div key={p.id} className="flex justify-between items-center px-3 py-2">
                         <span className="text-muted-foreground truncate max-w-[60%]">Abono: {p.name}</span>
@@ -261,8 +279,12 @@ export default function FinanceDashboard() {
                     )
                   })}
                   {activeDailyQuotaDebts.filter(q => q.isActive).map(q => {
+                    const start = new Date(q.startDate); start.setHours(0, 0, 0, 0)
                     const isWeekly = q.frequency === 'weekly'
-                    const daily = Math.ceil(q.totalAmount / q.totalDays / (isWeekly ? 7 : 1))
+                    const daysPassed = Math.floor((breakdownTodayStart.getTime() - start.getTime()) / 86400000)
+                    const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
+                    if (periodsPassed >= q.totalDays) return null
+                    const daily = getRemainingWorkingDays > 0 ? Math.ceil(q.totalAmount / getRemainingWorkingDays) : 0
                     return (
                       <div key={q.id} className="flex justify-between items-center px-3 py-2">
                         <span className="text-muted-foreground truncate max-w-[60%]">Cuota: {q.name}</span>
@@ -270,6 +292,12 @@ export default function FinanceDashboard() {
                       </div>
                     )
                   })}
+                  {netIncome > 0 && getRemainingWorkingDays > 0 && (
+                    <div className="flex justify-between items-center px-3 py-2">
+                      <span className="text-muted-foreground">Ya ganado este mes</span>
+                      <span className="font-semibold text-green-600">-{formatCurrency(Math.floor(netIncome / getRemainingWorkingDays))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center px-3 py-2 bg-muted">
                     <span className="font-semibold">Total meta</span>
                     <span className="font-bold text-primary">{formatCurrency(dailyTarget)}</span>
