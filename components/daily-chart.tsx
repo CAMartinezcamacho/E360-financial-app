@@ -134,32 +134,32 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
     const dayData = dailyData.find((d) => d.dayLabel === label)
     if (!dayData) return null
     return (
-      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-xs">
-        <p className="font-semibold mb-2">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 shadow-lg text-xs">
+        <p className="font-semibold mb-2 text-white">
           {dayData.day} de {monthNames[currentMonth]}
-          {dayData.isToday && <span className="ml-2 text-accent">(Hoy)</span>}
+          {dayData.isToday && <span className="ml-2 text-green-400">(Hoy)</span>}
         </p>
         {viewMode === 'comparison' ? (
           <>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Ventas</span>
-              <span className="font-medium text-green-500">+{formatCurrency(dayData.sales)}</span>
+              <span className="text-zinc-400">Ventas</span>
+              <span className="font-medium text-green-400">+{formatCurrency(dayData.sales)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Gastos</span>
-              <span className="font-medium text-red-500">-{formatCurrency(dayData.expenses)}</span>
+              <span className="text-zinc-400">Gastos</span>
+              <span className="font-medium text-red-400">-{formatCurrency(dayData.expenses)}</span>
             </div>
-            <div className="flex justify-between gap-4 border-t border-border pt-1 mt-1">
-              <span className="text-muted-foreground">Neto</span>
-              <span className={`font-bold ${dayData.net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <div className="flex justify-between gap-4 border-t border-zinc-700 pt-1 mt-1">
+              <span className="text-zinc-400">Neto</span>
+              <span className={`font-bold ${dayData.net >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {dayData.net >= 0 ? '+' : ''}{formatCurrency(dayData.net)}
               </span>
             </div>
           </>
         ) : (
           <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Neto</span>
-            <span className={`font-bold ${dayData.net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <span className="text-zinc-400">Neto</span>
+            <span className={`font-bold ${dayData.net >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {dayData.net >= 0 ? '+' : ''}{formatCurrency(dayData.net)}
             </span>
           </div>
@@ -171,16 +171,16 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
   const tickInterval = Math.max(0, Math.ceil(totalPoints / 8) - 1)
 
   return (
-    <Card className="border-border/50">
+    <Card className="border-border/50 bg-zinc-950">
       <CardHeader className="pb-2 px-3">
         <button className="flex items-center justify-between w-full" onClick={() => setIsOpen(!isOpen)}>
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-accent" />
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-white">
+            <TrendingUp className="w-4 h-4 text-green-500" />
             Gráfica Diaria
           </CardTitle>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground">{summary.daysWithData} días</span>
-            {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            <span className="text-[10px] text-zinc-400">{summary.daysWithData} días</span>
+            {isOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
           </div>
         </button>
       </CardHeader>
@@ -191,7 +191,7 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
             <Button
               variant={viewMode === 'comparison' ? 'default' : 'outline'}
               size="sm"
-              className="flex-1 h-7 text-[11px] px-2"
+              className={`flex-1 h-7 text-[11px] px-2 ${viewMode === 'comparison' ? 'bg-zinc-700 text-white border-zinc-600 hover:bg-zinc-600' : 'bg-transparent text-zinc-400 border-zinc-700 hover:bg-zinc-800'}`}
               onClick={() => setViewMode('comparison')}
             >
               Ventas vs Gastos
@@ -199,7 +199,7 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
             <Button
               variant={viewMode === 'net' ? 'default' : 'outline'}
               size="sm"
-              className="flex-1 h-7 text-[11px] px-2"
+              className={`flex-1 h-7 text-[11px] px-2 ${viewMode === 'net' ? 'bg-zinc-700 text-white border-zinc-600 hover:bg-zinc-600' : 'bg-transparent text-zinc-400 border-zinc-700 hover:bg-zinc-800'}`}
               onClick={() => setViewMode('net')}
             >
               Balance Neto
@@ -207,21 +207,21 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
           </div>
 
           {/* Extra top padding so labels above dots don't get clipped */}
-          <div className="h-60 w-full">
+          <div className="h-60 w-full rounded-xl bg-zinc-900 px-1 py-1">
             <ChartContainer config={chartConfig} className="h-full w-full">
               <LineChart data={dailyData} margin={{ top: 18, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" />
                 <XAxis
                   dataKey="dayLabel"
-                  tick={{ fontSize: 9 }}
+                  tick={{ fontSize: 9, fill: '#a1a1aa' }}
                   tickLine={false}
                   axisLine={false}
                   interval={tickInterval}
                   height={20}
-                  label={{ value: 'Días', position: 'insideBottomRight', offset: -4, fontSize: 9, fill: '#9ca3af' }}
+                  label={{ value: 'Días', position: 'insideBottomRight', offset: -4, fontSize: 9, fill: '#71717a' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 8 }}
+                  tick={{ fontSize: 8, fill: '#a1a1aa' }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
@@ -272,31 +272,31 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
             <div className="flex items-center justify-center gap-5 text-[10px]">
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-0.5 bg-green-500 rounded-full" />
-                <span className="text-muted-foreground">Ventas</span>
+                <span className="text-zinc-400">Ventas</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-0.5 bg-red-500 rounded-full" />
-                <span className="text-muted-foreground">Gastos</span>
+                <span className="text-zinc-400">Gastos</span>
               </div>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-accent/10 rounded-lg p-2.5">
+            <div className="bg-green-500/10 rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <TrendingUp className="w-3 h-3 text-accent flex-shrink-0" />
-                <span className="text-[10px] text-muted-foreground">Prom. Ventas</span>
+                <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
+                <span className="text-[10px] text-zinc-400">Prom. Ventas</span>
               </div>
-              <p className="text-sm font-bold text-accent truncate">
+              <p className="text-sm font-bold text-green-400 truncate">
                 {formatCurrency(summary.avgSales)}<span className="text-[10px] font-normal">/día</span>
               </p>
             </div>
-            <div className="bg-destructive/10 rounded-lg p-2.5">
+            <div className="bg-red-500/10 rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <TrendingDown className="w-3 h-3 text-destructive flex-shrink-0" />
-                <span className="text-[10px] text-muted-foreground">Prom. Gastos</span>
+                <TrendingDown className="w-3 h-3 text-red-500 flex-shrink-0" />
+                <span className="text-[10px] text-zinc-400">Prom. Gastos</span>
               </div>
-              <p className="text-sm font-bold text-destructive truncate">
+              <p className="text-sm font-bold text-red-400 truncate">
                 {formatCurrency(summary.avgExpenses)}<span className="text-[10px] font-normal">/día</span>
               </p>
             </div>
@@ -304,36 +304,36 @@ export function DailyChart({ transactions, formatCurrency }: DailyChartProps) {
 
           {summary.daysWithData > 0 && (
             <div className="grid grid-cols-2 gap-2">
-              <div className="border border-accent/30 rounded-lg p-2.5">
+              <div className="border border-green-500/30 rounded-lg p-2.5">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Calendar className="w-3 h-3 text-accent flex-shrink-0" />
-                  <span className="text-[10px] text-muted-foreground">Mejor Día</span>
+                  <Calendar className="w-3 h-3 text-green-500 flex-shrink-0" />
+                  <span className="text-[10px] text-zinc-400">Mejor Día</span>
                 </div>
-                <p className="text-xs font-semibold">Día {summary.bestDay?.day}</p>
-                <p className="text-[10px] text-accent truncate">+{formatCurrency(summary.bestDay?.net ?? 0)}</p>
+                <p className="text-xs font-semibold text-white">Día {summary.bestDay?.day}</p>
+                <p className="text-[10px] text-green-400 truncate">+{formatCurrency(summary.bestDay?.net ?? 0)}</p>
               </div>
-              <div className="border border-destructive/30 rounded-lg p-2.5">
+              <div className="border border-red-500/30 rounded-lg p-2.5">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Calendar className="w-3 h-3 text-destructive flex-shrink-0" />
-                  <span className="text-[10px] text-muted-foreground">Peor Día</span>
+                  <Calendar className="w-3 h-3 text-red-500 flex-shrink-0" />
+                  <span className="text-[10px] text-zinc-400">Peor Día</span>
                 </div>
-                <p className="text-xs font-semibold">Día {summary.worstDay?.day}</p>
-                <p className={`text-[10px] truncate ${(summary.worstDay?.net ?? 0) >= 0 ? 'text-accent' : 'text-destructive'}`}>
+                <p className="text-xs font-semibold text-white">Día {summary.worstDay?.day}</p>
+                <p className={`text-[10px] truncate ${(summary.worstDay?.net ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(summary.worstDay?.net ?? 0) >= 0 ? '+' : ''}{formatCurrency(summary.worstDay?.net ?? 0)}
                 </p>
               </div>
             </div>
           )}
 
-          <div className="border-t border-border pt-2.5">
+          <div className="border-t border-zinc-800 pt-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground flex-shrink-0">Total Mes</span>
+              <span className="text-xs text-zinc-400 flex-shrink-0">Total Mes</span>
               <div className="text-right min-w-0">
-                <span className="text-sm font-bold block truncate">
+                <span className={`text-sm font-bold block truncate ${summary.totalSales - summary.totalExpenses >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {summary.totalSales - summary.totalExpenses >= 0 ? '+' : ''}
                   {formatCurrency(summary.totalSales - summary.totalExpenses)}
                 </span>
-                <p className="text-[10px] text-muted-foreground truncate">
+                <p className="text-[10px] text-zinc-500 truncate">
                   V: {formatCurrency(summary.totalSales)} | G: {formatCurrency(summary.totalExpenses)}
                 </p>
               </div>
