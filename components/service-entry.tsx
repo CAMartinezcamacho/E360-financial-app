@@ -52,7 +52,6 @@ interface ServiceEntryProps {
   accounts: Account[]
 }
 
-const quickAmounts = [50, 100, 200, 500, 1000]
 const expenseSuggestions = ['Cafe', 'Almuerzo', 'Transporte', 'Snack', 'Gasolina']
 
 // Platform commission defaults
@@ -200,14 +199,6 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
     }
   }
 
-  const handleQuickAmount = (quickAmount: number) => {
-    if (serviceType === 'platform_trip') {
-      setGrossAmount(quickAmount.toString())
-    } else {
-      setAmount(quickAmount.toString())
-    }
-  }
-
   const isExpense = type === 'expense'
 
   return (
@@ -352,20 +343,6 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
                 </div>
               </div>
 
-              {/* Quick Amounts */}
-              <div className="flex gap-2 flex-wrap">
-                {[100, 200, 300, 500, 1000].map((quickAmount) => (
-                  <Button
-                    key={quickAmount}
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-3"
-                    onClick={() => handleQuickAmount(quickAmount)}
-                  >
-                    {currencySymbol}{quickAmount}
-                  </Button>
-                ))}
-              </div>
             </>
           )}
 
@@ -410,20 +387,6 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
                 </div>
               </div>
 
-              {/* Quick Amounts */}
-              <div className="flex gap-2 flex-wrap">
-                {[200, 500, 1000, 2000, 5000].map((quickAmount) => (
-                  <Button
-                    key={quickAmount}
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-3"
-                    onClick={() => setAmount(quickAmount.toString())}
-                  >
-                    {currencySymbol}{quickAmount}
-                  </Button>
-                ))}
-              </div>
             </>
           )}
 
@@ -454,20 +417,6 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
                       <X className="w-4 h-4" />
                     </Button>
                   )}
-                </div>
-                
-                <div className="flex gap-2 flex-wrap">
-                  {quickAmounts.map((quickAmount) => (
-                    <Button
-                      key={quickAmount}
-                      variant="outline"
-                      size="sm"
-                      className="h-9 px-3"
-                      onClick={() => handleQuickAmount(quickAmount)}
-                    >
-                      {currencySymbol}{quickAmount}
-                    </Button>
-                  ))}
                 </div>
               </div>
 
@@ -523,20 +472,6 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
                       <X className="w-4 h-4" />
                     </Button>
                   )}
-                </div>
-                
-                <div className="flex gap-2 flex-wrap">
-                  {quickAmounts.map((quickAmount) => (
-                    <Button
-                      key={quickAmount}
-                      variant="outline"
-                      size="sm"
-                      className="h-9 px-3"
-                      onClick={() => handleQuickAmount(quickAmount)}
-                    >
-                      {currencySymbol}{quickAmount}
-                    </Button>
-                  ))}
                 </div>
               </div>
 

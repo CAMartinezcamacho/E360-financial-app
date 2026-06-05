@@ -119,4 +119,16 @@ export interface FinanceState {
   recurringDebts: RecurringDebt[] // (legacy — kept for data migration)
   dailyQuotaDebts: DailyQuotaDebt[] // Cuotas diarias (gota a gota)
   debtPlans: DebtPlan[] // Deudas con abono periódico
+  currentShift?: {
+    id: string
+    startTime: Date
+  }
+}
+
+export interface ShiftSummary {
+  tripCount: number
+  totalEarned: number
+  walletBalances: Record<string, number>
+  startTime: Date
+  endTime: Date
 }

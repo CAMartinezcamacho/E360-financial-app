@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFinance } from '@/hooks/use-finance'
 import { TransactionFeed } from '@/components/transaction-feed'
 import { FixedExpenses } from '@/components/fixed-expenses'
@@ -17,19 +17,34 @@ import { HourlyChart } from '@/components/hourly-chart'
 import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
 import { DebtPlans } from '@/components/debt-plans'
+import { ShiftSummaryModal } from '@/components/shift-summary'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Zap, Minus, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
+import type { ShiftSummary } from '@/lib/types'
 
 type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
 
+function ElapsedTime({ startTime }: { startTime: Date }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(timer)
+  }, [])
+  const ms = Date.now() - new Date(startTime).getTime()
+  const hours = Math.floor(ms / (1000 * 60 * 60))
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+  return <>{hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`}</>
+}
+
 export default function FinanceDashboard() {
-  const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
+  const [entryType, setEntryType] = useState<'expense' | null>(null)
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null)
 
   const {
     isLoaded,
@@ -100,7 +115,10 @@ export default function FinanceDashboard() {
     debtPlans,
     calculateDailyQuotaPortion,
     activeDailyQuotaDebts,
-    todayPlatformBreakdown,
+    isShiftActive,
+    currentShift,
+    startShift,
+    endShift,
   } = useFinance()
 
   if (needsOnboarding) {
@@ -139,12 +157,45 @@ export default function FinanceDashboard() {
   const missing = Math.max(0, dailyTarget - todaySales)
   const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
 
+  const handleEndShift = () => {
+    const summary = endShift()
+    if (summary) setShiftSummary(summary)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-lg mx-auto p-4 pb-24 space-y-4">
 
         {activeTab === 'hoy' && (
           <>
+            {/* Shift button */}
+            {isShiftActive && currentShift ? (
+              <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-2.5">
+                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Turno en curso · <ElapsedTime startTime={currentShift.startTime} />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10"
+                  onClick={handleEndShift}
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  Finalizar
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full h-11 gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
+                variant="ghost"
+                onClick={startShift}
+              >
+                <Play className="w-4 h-4" />
+                Iniciar turno
+              </Button>
+            )}
+
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <button className="w-full text-left" onClick={() => setShowBreakdown((v) => !v)}>
                 <div className="flex items-start justify-between">
@@ -177,14 +228,12 @@ export default function FinanceDashboard() {
               </div>
               {showBreakdown && (
                 <div className="rounded-xl bg-muted/60 border border-border divide-y divide-border text-xs overflow-hidden">
-                  {/* Fixed expenses shortfall */}
                   {baseShortfallDaily > 0 && (
                     <div className="flex justify-between items-center px-3 py-2">
                       <span className="text-muted-foreground">Gastos fijos (saldo pendiente)</span>
                       <span className="font-semibold">{formatCurrency(baseShortfallDaily)}</span>
                     </div>
                   )}
-                  {/* Debt plans */}
                   {debtPlans.filter(p => p.isActive && p.remainingAmount > 0).map(p => {
                     const divisors: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: daysInMonth }
                     const daily = Math.ceil(p.paymentAmount / (divisors[p.frequency] || 30))
@@ -195,7 +244,6 @@ export default function FinanceDashboard() {
                       </div>
                     )
                   })}
-                  {/* Daily quota debts */}
                   {activeDailyQuotaDebts.filter(q => q.isActive).map(q => {
                     const isWeekly = q.frequency === 'weekly'
                     const daily = Math.ceil(q.totalAmount / q.totalDays / (isWeekly ? 7 : 1))
@@ -206,7 +254,6 @@ export default function FinanceDashboard() {
                       </div>
                     )
                   })}
-                  {/* Total */}
                   <div className="flex justify-between items-center px-3 py-2 bg-muted">
                     <span className="font-semibold">Total meta</span>
                     <span className="font-bold text-primary">{formatCurrency(dailyTarget)}</span>
@@ -392,6 +439,13 @@ export default function FinanceDashboard() {
         onSubmit={addTransaction}
         currencySymbol={state.settings.currencySymbol}
         accounts={state.accounts}
+      />
+
+      <ShiftSummaryModal
+        summary={shiftSummary}
+        accounts={state.accounts}
+        formatCurrency={formatCurrency}
+        onClose={() => setShiftSummary(null)}
       />
     </div>
   )

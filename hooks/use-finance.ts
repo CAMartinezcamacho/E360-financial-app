@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, DebtPlan, ServiceType, RidePlatform } from '@/lib/types'
+import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, DebtPlan, ServiceType, RidePlatform, ShiftSummary } from '@/lib/types'
 import { scheduleSave, loadFromCloud } from '@/lib/cloud-sync'
 
 const STORAGE_KEY = 'flujopro-finance-data'
@@ -100,6 +100,9 @@ function parseStoredData(data: string): FinanceState {
         ...d,
         startDate: new Date(d.startDate),
       })),
+      currentShift: parsed.currentShift
+        ? { id: parsed.currentShift.id, startTime: new Date(parsed.currentShift.startTime) }
+        : undefined,
     }
   } catch {
     return defaultState
@@ -733,6 +736,40 @@ export function useFinance() {
     localStorage.removeItem(STORAGE_KEY)
   }, [])
 
+  const startShift = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      currentShift: { id: crypto.randomUUID(), startTime: new Date() },
+    }))
+  }, [])
+
+  const endShift = useCallback((): ShiftSummary | null => {
+    if (!state.currentShift) return null
+    const shiftStart = new Date(state.currentShift.startTime)
+    const shiftTxns = state.transactions.filter(
+      (t) => new Date(t.timestamp) >= shiftStart
+    )
+    const isInternal = (title: string) =>
+      title.startsWith('↗ ') || title.startsWith('↙ ') ||
+      title.startsWith('Reinicio de saldo') || title.startsWith('Ajuste:')
+    const trips = shiftTxns.filter((t) => t.type === 'sale' && !isInternal(t.title))
+    const walletBalances: Record<string, number> = {}
+    state.accounts.forEach((a) => { walletBalances[a.id] = 0 })
+    shiftTxns.forEach((t) => {
+      if (t.accountId && walletBalances[t.accountId] !== undefined) {
+        walletBalances[t.accountId] += t.type === 'sale' ? t.amount : -t.amount
+      }
+    })
+    setState((prev) => ({ ...prev, currentShift: undefined }))
+    return {
+      tripCount: trips.length,
+      totalEarned: trips.reduce((sum, t) => sum + t.amount, 0),
+      walletBalances,
+      startTime: shiftStart,
+      endTime: new Date(),
+    }
+  }, [state])
+
   // Calculations
   const totalFixedExpenses = state.fixedExpenses.reduce((sum, e) => sum + e.amount, 0)
   const unpaidFixedExpenses = state.fixedExpenses.filter((e) => !e.isPaid).reduce((sum, e) => sum + e.amount, 0)
@@ -1189,5 +1226,10 @@ export function useFinance() {
     calculateDebtPlanDailyPortion,
     upcomingDebtPayments,
     debtPlans: state.debtPlans,
+    // Shift management
+    currentShift: state.currentShift,
+    isShiftActive: !!state.currentShift,
+    startShift,
+    endShift,
   }
 }
