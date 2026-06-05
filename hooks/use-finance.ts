@@ -737,10 +737,34 @@ export function useFinance() {
   }, [])
 
   const startShift = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      currentShift: { id: crypto.randomUUID(), startTime: new Date() },
-    }))
+    setState((prev) => {
+      const now = new Date()
+      // Create zeroing transactions for all accounts with non-zero balance
+      const resetTransactions: Transaction[] = []
+      prev.accounts.forEach((account) => {
+        let balance = 0
+        prev.transactions.forEach((t) => {
+          if (t.accountId === account.id) {
+            balance += t.type === 'sale' ? t.amount : -t.amount
+          }
+        })
+        if (balance !== 0) {
+          resetTransactions.push({
+            id: crypto.randomUUID(),
+            type: balance > 0 ? 'expense' : 'sale',
+            amount: Math.abs(balance),
+            title: 'Reinicio de saldo',
+            timestamp: now,
+            accountId: account.id,
+          })
+        }
+      })
+      return {
+        ...prev,
+        currentShift: { id: crypto.randomUUID(), startTime: now },
+        transactions: [...resetTransactions, ...prev.transactions],
+      }
+    })
   }, [])
 
   const endShift = useCallback((): ShiftSummary | null => {

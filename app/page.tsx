@@ -23,6 +23,16 @@ import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap } from 'lucide-r
 import { Onboarding } from '@/components/onboarding'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { ShiftSummary } from '@/lib/types'
 
 type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
@@ -45,6 +55,7 @@ export default function FinanceDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null)
+  const [confirmEndShift, setConfirmEndShift] = useState(false)
 
   const {
     isLoaded,
@@ -162,6 +173,11 @@ export default function FinanceDashboard() {
     if (summary) setShiftSummary(summary)
   }
 
+  const handleConfirmEndShift = () => {
+    setConfirmEndShift(false)
+    handleEndShift()
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-lg mx-auto p-4 pb-24 space-y-4">
@@ -179,7 +195,7 @@ export default function FinanceDashboard() {
                   size="sm"
                   variant="outline"
                   className="h-8 gap-1.5 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10"
-                  onClick={handleEndShift}
+                  onClick={() => setConfirmEndShift(true)}
                 >
                   <Square className="w-3.5 h-3.5" />
                   Finalizar
@@ -447,6 +463,23 @@ export default function FinanceDashboard() {
         formatCurrency={formatCurrency}
         onClose={() => setShiftSummary(null)}
       />
+
+      <AlertDialog open={confirmEndShift} onOpenChange={setConfirmEndShift}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalizar turno</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres finalizar el turno? Se mostrará el resumen de lo ganado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmEndShift}>
+              Finalizar turno
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
