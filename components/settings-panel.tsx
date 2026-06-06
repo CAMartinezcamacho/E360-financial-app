@@ -351,7 +351,7 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
 
           <div className="p-3 rounded-xl bg-secondary/50 border border-border">
             <p className="text-xs text-muted-foreground">
-              Los recordatorios funcionan mientras la app está abierta o en segundo plano. Fija la app en tu pantalla para mantenerla activa mientras conduces.
+              Para que funcionen con la pantalla bloqueada: ve a Ajustes del celular → Batería → Optimización de batería → busca Chrome y selecciona &quot;No optimizar&quot;.
             </p>
           </div>
         </CardContent>

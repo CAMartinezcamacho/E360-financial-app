@@ -816,21 +816,24 @@ export function useFinance() {
   }
 
   const now = new Date()
-  const currentShiftStart = getShiftStart(now)
-  const currentShiftEnd = new Date(currentShiftStart.getTime() + 24 * 60 * 60 * 1000)
-  const today = currentShiftStart
 
-  const todayTransactions = state.transactions.filter((t) => {
-    const ts = new Date(t.timestamp).getTime()
-    return ts >= currentShiftStart.getTime() && ts < currentShiftEnd.getTime()
-  })
+  // "Today" boundary: start of active shift, or calendar midnight if no shift.
+  // This means a shift started Monday 2 PM that runs past midnight still shows
+  // Monday's trips — no automatic cutoff at a fixed hour.
+  const midnight = new Date(now)
+  midnight.setHours(0, 0, 0, 0)
+  const currentShiftStart = state.currentShift
+    ? new Date(state.currentShift.startTime)
+    : midnight
 
+  const todayTransactions = state.transactions.filter(
+    (t) => new Date(t.timestamp).getTime() >= currentShiftStart.getTime()
+  )
+
+  // Monthly totals always use the actual calendar month of each transaction
   const monthTransactions = state.transactions.filter((t) => {
-    const shiftStart = getShiftStart(new Date(t.timestamp))
-    return (
-      shiftStart.getMonth() === today.getMonth() &&
-      shiftStart.getFullYear() === today.getFullYear()
-    )
+    const d = new Date(t.timestamp)
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   })
 
   // Identify internal/adjustment transactions that should NOT count toward totals
