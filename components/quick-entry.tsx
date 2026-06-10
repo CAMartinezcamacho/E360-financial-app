@@ -2,37 +2,42 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
-import { Check } from 'lucide-react'
+import { Check, MapPin } from 'lucide-react'
 import type { Account } from '@/lib/types'
 
 interface QuickEntryProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (type: 'sale', amount: number, title: string, accountId?: string) => void
+  onSubmit: (type: 'sale', amount: number, title: string, accountId?: string, km?: number) => void
   currencySymbol: string
   accounts: Account[]
 }
 
 export function QuickEntry({ isOpen, onClose, onSubmit, currencySymbol, accounts }: QuickEntryProps) {
   const [amount, setAmount] = useState('')
+  const [km, setKm] = useState('')
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isOpen) {
       setAmount('')
+      setKm('')
       setSelectedAccountId(accounts[0]?.id)
       setTimeout(() => inputRef.current?.focus(), 200)
     }
   }, [isOpen, accounts])
 
   const numAmount = parseFloat(amount) || 0
+  const numKm = parseFloat(km) > 0 ? parseFloat(km) : undefined
 
   const handleSubmit = () => {
     if (numAmount <= 0) return
-    onSubmit('sale', numAmount, 'Viaje', selectedAccountId)
+    onSubmit('sale', numAmount, 'Viaje', selectedAccountId, numKm)
     setAmount('')
+    setKm('')
     onClose()
   }
 
@@ -45,7 +50,7 @@ export function QuickEntry({ isOpen, onClose, onSubmit, currencySymbol, accounts
           <SheetDescription className="sr-only">Valor del viaje y método de pago</SheetDescription>
         </SheetHeader>
 
-        <div className="bg-muted rounded-xl px-4 py-4 mb-5 text-center">
+        <div className="bg-muted rounded-xl px-4 py-4 mb-4 text-center">
           <div className="flex items-center justify-center gap-1">
             <span className="text-2xl font-semibold text-muted-foreground">{currencySymbol}</span>
             <input
@@ -60,6 +65,25 @@ export function QuickEntry({ isOpen, onClose, onSubmit, currencySymbol, accounts
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1">Valor del viaje</p>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5" />
+            Kilómetros (opcional)
+          </p>
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode="decimal"
+              placeholder="0"
+              value={km}
+              onChange={(e) => setKm(e.target.value.replace(/[^0-9.]/g, ''))}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              className="h-11 pr-12"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">km</span>
+          </div>
         </div>
 
         {accounts.length > 0 && (

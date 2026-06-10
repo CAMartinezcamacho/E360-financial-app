@@ -176,15 +176,16 @@ export function useFinance() {
   }, [state, isLoaded])
 
   const addTransaction = useCallback((
-    type: 'sale' | 'expense', 
-    amount: number, 
-    title: string, 
+    type: 'sale' | 'expense',
+    amount: number,
+    title: string,
     accountId?: string,
     serviceType?: ServiceType,
     platform?: RidePlatform,
     grossAmount?: number,
     commissionPercent?: number,
-    companyName?: string
+    companyName?: string,
+    km?: number
   ) => {
     const transaction: Transaction = {
       id: crypto.randomUUID(),
@@ -198,6 +199,7 @@ export function useFinance() {
       grossAmount,
       commissionPercent,
       companyName,
+      km,
     }
     setState((prev) => ({
       ...prev,
@@ -781,15 +783,17 @@ export function useFinance() {
     const trips = shiftTxns.filter((t) => t.type === 'sale' && !isInternal(t.title))
     const walletBalances: Record<string, number> = {}
     state.accounts.forEach((a) => { walletBalances[a.id] = 0 })
-    shiftTxns.forEach((t) => {
+    shiftTxns.filter((t) => !isInternal(t.title)).forEach((t) => {
       if (t.accountId && walletBalances[t.accountId] !== undefined) {
         walletBalances[t.accountId] += t.type === 'sale' ? t.amount : -t.amount
       }
     })
+    const totalKm = trips.reduce((sum, t) => sum + (t.km ?? 0), 0)
     setState((prev) => ({ ...prev, currentShift: undefined }))
     return {
       tripCount: trips.length,
       totalEarned: trips.reduce((sum, t) => sum + t.amount, 0),
+      totalKm,
       walletBalances,
       startTime: shiftStart,
       endTime: new Date(),

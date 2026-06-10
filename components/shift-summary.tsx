@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Car, Clock, Wallet } from 'lucide-react'
+import { Car, Clock, Wallet, MapPin } from 'lucide-react'
 import type { Account, ShiftSummary } from '@/lib/types'
 
 interface ShiftSummaryModalProps {
@@ -61,6 +61,16 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, onClose }
               <p className="text-xs text-muted-foreground">total ganado</p>
             </div>
           </div>
+
+          {summary.totalKm > 0 && (
+            <div className="bg-blue-500/10 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-500" />
+                <span className="text-sm text-muted-foreground">Kilómetros recorridos</span>
+              </div>
+              <span className="text-lg font-bold text-blue-500">{summary.totalKm.toLocaleString('es')} km</span>
+            </div>
+          )}
 
           {walletsWithBalance.length > 0 && (
             <div className="rounded-xl border border-border overflow-hidden">

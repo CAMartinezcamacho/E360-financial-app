@@ -479,7 +479,9 @@ export default function FinanceDashboard() {
       <QuickEntry
         isOpen={quickEntryOpen}
         onClose={() => setQuickEntryOpen(false)}
-        onSubmit={addTransaction}
+        onSubmit={(type, amount, title, accountId, km) =>
+          addTransaction(type, amount, title, accountId, undefined, undefined, undefined, undefined, undefined, km)
+        }
         currencySymbol={state.settings.currencySymbol}
         accounts={state.accounts}
       />

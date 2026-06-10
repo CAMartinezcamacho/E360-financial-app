@@ -18,18 +18,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  X, 
-  Banknote, 
-  Smartphone, 
-  Car, 
-  CreditCard, 
-  Building, 
+import {
+  TrendingUp,
+  TrendingDown,
+  X,
+  Banknote,
+  Smartphone,
+  Car,
+  CreditCard,
+  Building,
   Wallet,
   Calculator,
-  Info
+  Info,
+  MapPin
 } from 'lucide-react'
 import type { Account, ServiceType, RidePlatform } from '@/lib/types'
 
@@ -38,15 +39,16 @@ interface ServiceEntryProps {
   type: 'sale' | 'expense' | null
   onClose: () => void
   onSubmit: (
-    type: 'sale' | 'expense', 
-    amount: number, 
-    title: string, 
+    type: 'sale' | 'expense',
+    amount: number,
+    title: string,
     accountId?: string,
     serviceType?: ServiceType,
     platform?: RidePlatform,
     grossAmount?: number,
     commissionPercent?: number,
-    companyName?: string
+    companyName?: string,
+    km?: number
   ) => void
   currencySymbol: string
   accounts: Account[]
@@ -104,6 +106,7 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
   const [amount, setAmount] = useState('')
   const [title, setTitle] = useState('')
   const [accountId, setAccountId] = useState<string>('none')
+  const [km, setKm] = useState('')
 
   // Reset form when opened
   useEffect(() => {
@@ -119,6 +122,7 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
       setAmount('')
       setTitle('')
       setAccountId('none')
+      setKm('')
     }
   }, [isOpen, type])
 
@@ -151,19 +155,22 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
       let finalAmount = parseFloat(amount)
       let finalTitle = title.trim()
       
+      const parsedKm = parseFloat(km) > 0 ? parseFloat(km) : undefined
       if (serviceType === 'platform_trip') {
         finalAmount = parseFloat(amount) || 0
         finalTitle = `${platformNames[platform]}: ${currencySymbol}${grossAmount} bruto`
         if (finalAmount > 0) {
           onSubmit(
-            'sale', 
-            finalAmount, 
-            finalTitle, 
+            'sale',
+            finalAmount,
+            finalTitle,
             accountId === 'none' ? undefined : accountId,
             'platform_trip',
             platform,
             parseFloat(grossAmount),
-            parseFloat(commissionPercent)
+            parseFloat(commissionPercent),
+            undefined,
+            parsedKm
           )
           onClose()
         }
@@ -179,7 +186,8 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
             undefined,
             undefined,
             undefined,
-            companyName.trim()
+            companyName.trim(),
+            parsedKm
           )
           onClose()
         }
@@ -191,7 +199,12 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
             finalAmount,
             finalTitle,
             accountId === 'none' ? undefined : accountId,
-            serviceType === 'other' ? 'other' : 'sale'
+            serviceType === 'other' ? 'other' : 'sale',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            parsedKm
           )
           onClose()
         }
@@ -498,6 +511,26 @@ export function ServiceEntry({ isOpen, type, onClose, onSubmit, currencySymbol, 
                 </div>
               </div>
             </>
+          )}
+
+          {/* Km field - only for sales */}
+          {!isExpense && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                Kilómetros (opcional)
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  value={km}
+                  onChange={(e) => setKm(e.target.value)}
+                  placeholder="0"
+                  className="h-12 pr-12"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">km</span>
+              </div>
+            </div>
           )}
 
           {/* Account Selection */}

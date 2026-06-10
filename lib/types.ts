@@ -24,6 +24,7 @@ export interface Transaction {
   grossAmount?: number // Original amount before commission
   commissionPercent?: number // Platform commission percentage
   companyName?: string // For corporate services
+  km?: number // Distance traveled for this trip
 }
 
 export interface FixedExpense {
@@ -130,6 +131,7 @@ export interface FinanceState {
 export interface ShiftSummary {
   tripCount: number
   totalEarned: number
+  totalKm: number
   walletBalances: Record<string, number>
   startTime: Date
   endTime: Date
