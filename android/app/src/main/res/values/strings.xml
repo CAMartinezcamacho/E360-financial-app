@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">E360</string>
+    <string name="title_activity_main">E360</string>
+    <string name="package_name">com.e360.financiero</string>
+    <string name="custom_url_scheme">com.e360.financiero</string>
+</resources>

@@ -1,9 +1,15 @@
 // Cloud sync helpers — talk to /api/sync which proxies to Oracle ORDS
+// In Capacitor (native app), uses NEXT_PUBLIC_SYNC_API_URL to call the Vercel API directly
 
 let syncTimeout: ReturnType<typeof setTimeout> | null = null
 let isSyncing = false
 
 const SYNC_KEY_STORAGE = 'e360-sync-key'
+
+// When running as native app (Capacitor WebView on localhost), relative URLs won't work.
+// Set NEXT_PUBLIC_SYNC_API_URL=https://your-app.vercel.app during `npm run build:cap`
+const API_BASE =
+  process.env.NEXT_PUBLIC_SYNC_API_URL || '/api/sync'
 
 export function getSyncKey(): string {
   if (typeof window === 'undefined') return 'default'
@@ -18,7 +24,8 @@ export function setSyncKey(key: string) {
 export async function saveToCloud(state: object): Promise<boolean> {
   try {
     const key = getSyncKey()
-    const res = await fetch(`/api/sync?key=${encodeURIComponent(key)}`, {
+    const url = API_BASE.includes('?') ? API_BASE : `${API_BASE}?key=${encodeURIComponent(key)}`
+    const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
@@ -32,7 +39,8 @@ export async function saveToCloud(state: object): Promise<boolean> {
 export async function loadFromCloud(key?: string): Promise<object | null> {
   try {
     const syncKey = key || getSyncKey()
-    const res = await fetch(`/api/sync?key=${encodeURIComponent(syncKey)}`)
+    const url = `${API_BASE}?key=${encodeURIComponent(syncKey)}`
+    const res = await fetch(url)
     if (!res.ok) return null
     const data = await res.json()
     return data.found ? data.state : null

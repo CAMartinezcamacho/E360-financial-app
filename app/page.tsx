@@ -19,9 +19,10 @@ import { MonthlySummary } from '@/components/monthly-summary'
 import { DebtPlans } from '@/components/debt-plans'
 import { ShiftSummaryModal } from '@/components/shift-summary'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap } from 'lucide-react'
+import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap, Navigation } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
 import { useNotifications } from '@/hooks/use-notifications'
+import { useGpsTracking } from '@/hooks/use-gps-tracking'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,6 +57,7 @@ export default function FinanceDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null)
+  const [shiftGpsKm, setShiftGpsKm] = useState(0)
   const [confirmEndShift, setConfirmEndShift] = useState(false)
 
   const {
@@ -140,6 +142,8 @@ export default function FinanceDashboard() {
     intervalMinutes: state.settings.notificationInterval ?? 30,
   })
 
+  const { totalKm: gpsKm, status: gpsStatus } = useGpsTracking({ isShiftActive })
+
   if (needsOnboarding) {
     return (
       <Onboarding
@@ -180,7 +184,10 @@ export default function FinanceDashboard() {
 
   const handleEndShift = () => {
     const summary = endShift()
-    if (summary) setShiftSummary(summary)
+    if (summary) {
+      setShiftSummary(summary)
+      setShiftGpsKm(gpsKm)
+    }
   }
 
   const handleConfirmEndShift = () => {
@@ -196,20 +203,41 @@ export default function FinanceDashboard() {
           <>
             {/* Shift button */}
             {isShiftActive && currentShift ? (
-              <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-2.5">
-                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Turno en curso · <ElapsedTime startTime={currentShift.startTime} />
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    Turno en curso · <ElapsedTime startTime={currentShift.startTime} />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10"
+                    onClick={() => setConfirmEndShift(true)}
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                    Finalizar
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10"
-                  onClick={() => setConfirmEndShift(true)}
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  Finalizar
-                </Button>
+                {/* GPS km indicator */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Navigation className={`w-3 h-3 ${gpsStatus === 'tracking' ? 'text-blue-400' : 'text-muted-foreground'}`} />
+                  {gpsStatus === 'tracking' && (
+                    <span className="text-blue-400 font-medium">{gpsKm.toLocaleString('es')} km recorridos</span>
+                  )}
+                  {gpsStatus === 'requesting' && (
+                    <span className="text-muted-foreground">Activando GPS…</span>
+                  )}
+                  {gpsStatus === 'denied' && (
+                    <span className="text-yellow-500">GPS sin permiso — km no disponibles</span>
+                  )}
+                  {gpsStatus === 'paused' && (
+                    <span className="text-muted-foreground">{gpsKm > 0 ? `${gpsKm} km (GPS pausado)` : 'GPS pausado'}</span>
+                  )}
+                  {gpsStatus === 'unavailable' && (
+                    <span className="text-muted-foreground">GPS no disponible</span>
+                  )}
+                </div>
               </div>
             ) : (
               <Button
@@ -499,7 +527,8 @@ export default function FinanceDashboard() {
         summary={shiftSummary}
         accounts={state.accounts}
         formatCurrency={formatCurrency}
-        onClose={() => setShiftSummary(null)}
+        gpsKm={shiftGpsKm}
+        onClose={() => { setShiftSummary(null); setShiftGpsKm(0) }}
       />
 
       <AlertDialog open={confirmEndShift} onOpenChange={setConfirmEndShift}>

@@ -8,13 +8,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Car, Clock, Wallet, MapPin } from 'lucide-react'
+import { Car, Clock, Wallet, MapPin, Navigation } from 'lucide-react'
 import type { Account, ShiftSummary } from '@/lib/types'
 
 interface ShiftSummaryModalProps {
   summary: ShiftSummary | null
   accounts: Account[]
   formatCurrency: (amount: number) => string
+  gpsKm?: number
   onClose: () => void
 }
 
@@ -30,7 +31,7 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function ShiftSummaryModal({ summary, accounts, formatCurrency, onClose }: ShiftSummaryModalProps) {
+export function ShiftSummaryModal({ summary, accounts, formatCurrency, gpsKm = 0, onClose }: ShiftSummaryModalProps) {
   if (!summary) return null
 
   const walletsWithBalance = accounts.filter(
@@ -62,13 +63,23 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, onClose }
             </div>
           </div>
 
-          {summary.totalKm > 0 && (
+          {gpsKm > 0 && (
             <div className="bg-blue-500/10 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-blue-500" />
-                <span className="text-sm text-muted-foreground">Kilómetros recorridos</span>
+                <Navigation className="w-4 h-4 text-blue-500" />
+                <span className="text-sm text-muted-foreground">Kilómetros recorridos (GPS)</span>
               </div>
-              <span className="text-lg font-bold text-blue-500">{summary.totalKm.toLocaleString('es')} km</span>
+              <span className="text-lg font-bold text-blue-500">{gpsKm.toLocaleString('es')} km</span>
+            </div>
+          )}
+
+          {summary.totalKm > 0 && (
+            <div className="bg-muted rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Km registrados (manual)</span>
+              </div>
+              <span className="text-lg font-bold">{summary.totalKm.toLocaleString('es')} km</span>
             </div>
           )}
 
