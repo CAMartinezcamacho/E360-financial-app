@@ -133,8 +133,8 @@ export default function FinanceDashboard() {
       !t.title.startsWith('Ajuste:') &&
       !t.title.startsWith('Reinicio de saldo')
   ).length
-  const missing = Math.max(0, dailyGoal - todaySales)
-  const progressPercent = dailyGoal > 0 ? Math.min(100, (todaySales / dailyGoal) * 100) : 0
+  const missing = Math.max(0, dailyGoal - todayBalance)
+  const progressPercent = dailyGoal > 0 ? Math.min(100, (todayBalance / dailyGoal) * 100) : 0
 
   const handleEndShift = () => {
     const summary = endShift()
@@ -246,7 +246,7 @@ export default function FinanceDashboard() {
                       <p className="text-xs text-muted-foreground">Meta de hoy</p>
                       <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyGoal)}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
+                        Llevás {formatCurrency(todayBalance)} · {progressPercent.toFixed(0)}%
                       </p>
                     </div>
                     <Pencil className="w-3.5 h-3.5 text-muted-foreground mt-1" />
@@ -263,7 +263,7 @@ export default function FinanceDashboard() {
                   }}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-[10px] text-muted-foreground">Viajes</p>
                   <p className="text-base font-semibold">{todayTripCount}</p>
@@ -271,6 +271,10 @@ export default function FinanceDashboard() {
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-[10px] text-muted-foreground">Ganado</p>
                   <p className="text-base font-semibold text-green-500">{formatCurrency(todaySales)}</p>
+                </div>
+                <div className="bg-muted rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">Gastos</p>
+                  <p className="text-base font-semibold text-red-400">{formatCurrency(todayExpenses)}</p>
                 </div>
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-[10px] text-muted-foreground">Faltan</p>

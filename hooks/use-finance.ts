@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Transaction, FinanceState, UserSettings, Account, ServiceType, RidePlatform, ShiftSummary, PlatformBreakdown } from '@/lib/types'
-import { scheduleSave, loadFromCloud } from '@/lib/cloud-sync'
+import { scheduleSave, loadFromCloud, saveToCloud } from '@/lib/cloud-sync'
 
 const STORAGE_KEY = 'flujopro-finance-data'
 
@@ -69,6 +69,16 @@ export function useFinance() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
+  // Ask the browser/WebView not to evict this app's local storage under
+  // storage pressure — Android in particular will otherwise silently wipe
+  // localStorage after the app is backgrounded/killed for a while, which
+  // looks like "my shift reset to zero" after reopening the app.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {})
+    }
+  }, [])
+
   // Load from localStorage; if empty try cloud restore
   useEffect(() => {
     const onboardingDone = localStorage.getItem(ONBOARDING_KEY)
@@ -123,6 +133,31 @@ export function useFinance() {
       scheduleSave(state, (ok) => setSyncStatus(ok ? 'saved' : 'error'))
     }
   }, [state, isLoaded])
+
+  // The cloud save above is debounced (3s of inactivity). If the phone gets
+  // locked or the app backgrounded right after a change (e.g. logging a trip
+  // then pocketing the phone), that timer may never fire before the app is
+  // suspended/killed. Flush an immediate, non-debounced save whenever the
+  // page is about to be hidden so the cloud copy doesn't lag behind.
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  useEffect(() => {
+    if (!isLoaded) return
+    const flushSave = () => {
+      if (document.visibilityState === 'hidden') {
+        saveToCloud(stateRef.current)
+      }
+    }
+    document.addEventListener('visibilitychange', flushSave)
+    window.addEventListener('pagehide', flushSave)
+    return () => {
+      document.removeEventListener('visibilitychange', flushSave)
+      window.removeEventListener('pagehide', flushSave)
+    }
+  }, [isLoaded])
 
   const addTransaction = useCallback((
     type: 'sale' | 'expense',
@@ -385,6 +420,7 @@ export function useFinance() {
       title.startsWith('↗ ') || title.startsWith('↙ ') ||
       title.startsWith('Reinicio de saldo') || title.startsWith('Ajuste:')
     const trips = shiftTxns.filter((t) => t.type === 'sale' && !isInternal(t.title))
+    const expenses = shiftTxns.filter((t) => t.type === 'expense' && !isInternal(t.title))
     const walletBalances: Record<string, number> = {}
     state.accounts.forEach((a) => { walletBalances[a.id] = 0 })
     shiftTxns.filter((t) => !isInternal(t.title)).forEach((t) => {
@@ -397,6 +433,7 @@ export function useFinance() {
     return {
       tripCount: trips.length,
       totalEarned: trips.reduce((sum, t) => sum + t.amount, 0),
+      totalExpenses: expenses.reduce((sum, t) => sum + t.amount, 0),
       totalKm,
       walletBalances,
       startTime: shiftStart,

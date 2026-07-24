@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Car, Clock, Wallet, MapPin, Navigation } from 'lucide-react'
+import { Car, Clock, Wallet, MapPin, Navigation, TrendingDown, Gauge, Timer } from 'lucide-react'
 import type { Account, ShiftSummary } from '@/lib/types'
 
 interface ShiftSummaryModalProps {
@@ -38,6 +38,12 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, gpsKm = 0
     (a) => (summary.walletBalances[a.id] ?? 0) !== 0
   )
 
+  const netMoney = summary.totalEarned - summary.totalExpenses
+  const kmForRate = gpsKm > 0 ? gpsKm : summary.totalKm
+  const hoursElapsed = (summary.endTime.getTime() - summary.startTime.getTime()) / (1000 * 60 * 60)
+  const perKm = kmForRate > 0 ? netMoney / kmForRate : 0
+  const perHour = hoursElapsed > 0 ? netMoney / hoursElapsed : 0
+
   return (
     <Dialog open={!!summary} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm mx-auto rounded-2xl">
@@ -61,6 +67,16 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, gpsKm = 0
               <p className="text-xl font-bold text-green-500">{formatCurrency(summary.totalEarned)}</p>
               <p className="text-xs text-muted-foreground">total ganado</p>
             </div>
+            <div className="bg-red-500/10 rounded-xl p-3 text-center">
+              <TrendingDown className="w-5 h-5 mx-auto mb-1 text-red-500" />
+              <p className="text-xl font-bold text-red-500">{formatCurrency(summary.totalExpenses)}</p>
+              <p className="text-xs text-muted-foreground">gastos del turno</p>
+            </div>
+            <div className="bg-primary/10 rounded-xl p-3 text-center">
+              <Wallet className="w-5 h-5 mx-auto mb-1 text-primary" />
+              <p className="text-xl font-bold text-primary">{formatCurrency(netMoney)}</p>
+              <p className="text-xs text-muted-foreground">debes tener</p>
+            </div>
           </div>
 
           {gpsKm > 0 && (
@@ -80,6 +96,21 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, gpsKm = 0
                 <span className="text-sm text-muted-foreground">Km registrados (manual)</span>
               </div>
               <span className="text-lg font-bold">{summary.totalKm.toLocaleString('es')} km</span>
+            </div>
+          )}
+
+          {kmForRate > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted rounded-xl p-3 text-center">
+                <Gauge className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-lg font-bold">{formatCurrency(perKm)}</p>
+                <p className="text-xs text-muted-foreground">por km</p>
+              </div>
+              <div className="bg-muted rounded-xl p-3 text-center">
+                <Timer className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-lg font-bold">{formatCurrency(perHour)}</p>
+                <p className="text-xs text-muted-foreground">por hora</p>
+              </div>
             </div>
           )}
 

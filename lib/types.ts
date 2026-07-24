@@ -59,6 +59,7 @@ export interface FinanceState {
 export interface ShiftSummary {
   tripCount: number
   totalEarned: number
+  totalExpenses: number
   totalKm: number
   walletBalances: Record<string, number>
   startTime: Date
