@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { Transaction, FixedExpense, FinanceState, UserSettings, Account, Credit, Liability, RecurringDebt, PaymentFrequency, DailyQuotaDebt, DebtPlan, ServiceType, RidePlatform, ShiftSummary } from '@/lib/types'
+import type { Transaction, FinanceState, UserSettings, Account, ServiceType, RidePlatform, ShiftSummary, PlatformBreakdown } from '@/lib/types'
 import { scheduleSave, loadFromCloud } from '@/lib/cloud-sync'
 
 const STORAGE_KEY = 'flujopro-finance-data'
@@ -9,7 +9,6 @@ const STORAGE_KEY = 'flujopro-finance-data'
 const defaultSettings: UserSettings = {
   userName: '',
   currencySymbol: '$',
-  nonWorkingDays: [0], // Sunday by default
   shiftStartHour: 0,
   notificationsEnabled: false,
   notificationInterval: 30,
@@ -22,31 +21,17 @@ const defaultAccounts: Account[] = [
   { id: 'didi', name: 'Didi', icon: 'car', color: 'orange' },
 ]
 
-const defaultFixedExpenses: FixedExpense[] = [
-  { id: '1', name: 'Arriendo', amount: 8000, dueDay: 22 },
-  { id: '2', name: 'Servicios', amount: 1500, dueDay: 15 },
-  { id: '3', name: 'Internet', amount: 600, dueDay: 5 },
-  { id: '4', name: 'Celular', amount: 400, dueDay: 10 },
-]
-
 const defaultState: FinanceState = {
   transactions: [],
-  fixedExpenses: defaultFixedExpenses,
-  monthlyIncome: 25000,
+  dailyGoal: 0,
   settings: defaultSettings,
   accounts: defaultAccounts,
-  credits: [],
-  liabilities: [],
-  recurringDebts: [],
-  dailyQuotaDebts: [],
-  debtPlans: [],
 }
 
 function parseStoredData(data: string): FinanceState {
   try {
     const parsed = JSON.parse(data)
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-    
+
     // Validate and sanitize accounts - ensure no empty values
     const validatedAccounts = (parsed.accounts || defaultAccounts).map((a: Account) => ({
       ...a,
@@ -58,6 +43,7 @@ function parseStoredData(data: string): FinanceState {
 
     return {
       ...parsed,
+      dailyGoal: typeof parsed.dailyGoal === 'number' ? parsed.dailyGoal : 0,
       settings: { ...defaultSettings, ...parsed.settings },
       accounts: validatedAccounts,
       transactions: (parsed.transactions || []).map((t: Transaction) => ({
@@ -65,42 +51,6 @@ function parseStoredData(data: string): FinanceState {
         timestamp: new Date(t.timestamp),
         // Ensure accountId is valid (not empty string)
         accountId: t.accountId && t.accountId !== '' ? t.accountId : undefined,
-      })),
-      // Reset isPaid status if month changed
-      fixedExpenses: (parsed.fixedExpenses || defaultFixedExpenses).map((e: FixedExpense) => ({
-        ...e,
-        id: e.id || crypto.randomUUID(),
-        name: e.name || 'Gasto',
-        amount: e.amount || 0,
-        isPaid: e.paidMonth === currentMonth ? e.isPaid : false,
-        paidMonth: e.paidMonth === currentMonth ? e.paidMonth : undefined,
-      })),
-      // Parse credits (Me Deben)
-      credits: (parsed.credits || []).map((c: Credit) => ({
-        ...c,
-        createdAt: new Date(c.createdAt),
-      })),
-      // Parse and reset liabilities (Debo) status if month changed
-      liabilities: (parsed.liabilities || []).map((l: Liability) => ({
-        ...l,
-        createdAt: new Date(l.createdAt),
-        status: l.paidMonth === currentMonth && l.status === 'paid' ? 'paid' : (l.status === 'partial' ? 'partial' : 'pending'),
-        paidMonth: l.paidMonth === currentMonth ? l.paidMonth : undefined,
-      })),
-      // Parse recurring debts
-      recurringDebts: (parsed.recurringDebts || []).map((d: RecurringDebt) => ({
-        ...d,
-        startDate: new Date(d.startDate),
-      })),
-      // Parse daily quota debts
-      dailyQuotaDebts: (parsed.dailyQuotaDebts || []).map((d: DailyQuotaDebt) => ({
-        ...d,
-        startDate: new Date(d.startDate),
-      })),
-      // Parse debt plans
-      debtPlans: (parsed.debtPlans || []).map((d: DebtPlan) => ({
-        ...d,
-        startDate: new Date(d.startDate),
       })),
       currentShift: parsed.currentShift
         ? { id: parsed.currentShift.id, startTime: new Date(parsed.currentShift.startTime) }
@@ -147,20 +97,19 @@ export function useFinance() {
   const completeOnboarding = useCallback((
     name: string,
     currency: string,
-    nonWorkingDays: number[],
     restoredState?: object | null
   ) => {
     localStorage.setItem(ONBOARDING_KEY, '1')
     if (restoredState) {
       const parsed = parseStoredData(JSON.stringify(restoredState))
       // Override name/currency with what user just entered
-      parsed.settings = { ...parsed.settings, userName: name, currencySymbol: currency, nonWorkingDays }
+      parsed.settings = { ...parsed.settings, userName: name, currencySymbol: currency }
       setState(parsed)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
     } else {
       setState((prev) => ({
         ...prev,
-        settings: { ...prev.settings, userName: name, currencySymbol: currency, nonWorkingDays },
+        settings: { ...prev.settings, userName: name, currencySymbol: currency },
       }))
     }
     setNeedsOnboarding(false)
@@ -214,58 +163,26 @@ export function useFinance() {
     }))
   }, [])
 
-  const addFixedExpense = useCallback((name: string, amount: number, dueDay?: number) => {
-    // Validate inputs
-    const validName = name.trim() || 'Nuevo Gasto'
-    const validAmount = amount > 0 ? amount : 0
-    
-    const expense: FixedExpense = {
-      id: crypto.randomUUID(),
-      name: validName,
-      amount: validAmount,
-      dueDay,
-      isPaid: false,
-    }
+  // Edit transaction (with optional date change)
+  const editTransaction = useCallback((id: string, amount: number, title: string, accountId?: string, newDate?: Date) => {
     setState((prev) => ({
       ...prev,
-      fixedExpenses: [...prev.fixedExpenses, expense],
-    }))
-  }, [])
-
-  const updateFixedExpense = useCallback((id: string, name: string, amount: number, dueDay?: number) => {
-    // Validate inputs
-    const validName = name.trim() || 'Gasto'
-    const validAmount = amount > 0 ? amount : 0
-    
-    setState((prev) => ({
-      ...prev,
-      fixedExpenses: prev.fixedExpenses.map((e) =>
-        e.id === id ? { ...e, name: validName, amount: validAmount, dueDay } : e
+      transactions: prev.transactions.map((t) =>
+        t.id === id ? {
+          ...t,
+          amount,
+          title,
+          accountId,
+          timestamp: newDate || t.timestamp
+        } : t
       ),
     }))
   }, [])
 
-  const toggleExpensePaid = useCallback((id: string) => {
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  const setDailyGoal = useCallback((goal: number) => {
     setState((prev) => ({
       ...prev,
-      fixedExpenses: prev.fixedExpenses.map((e) =>
-        e.id === id ? { ...e, isPaid: !e.isPaid, paidMonth: !e.isPaid ? currentMonth : undefined } : e
-      ),
-    }))
-  }, [])
-
-  const deleteFixedExpense = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      fixedExpenses: prev.fixedExpenses.filter((e) => e.id !== id),
-    }))
-  }, [])
-
-  const setMonthlyIncome = useCallback((income: number) => {
-    setState((prev) => ({
-      ...prev,
-      monthlyIncome: income,
+      dailyGoal: Math.max(0, goal),
     }))
   }, [])
 
@@ -281,7 +198,7 @@ export function useFinance() {
     const validName = name.trim() || 'Nueva Cuenta'
     const validIcon = icon || 'wallet'
     const validColor = color || 'emerald'
-    
+
     const account: Account = {
       id: crypto.randomUUID(),
       name: validName,
@@ -299,7 +216,7 @@ export function useFinance() {
     const validName = name.trim() || 'Cuenta'
     const validIcon = icon || 'wallet'
     const validColor = color || 'emerald'
-    
+
     setState((prev) => ({
       ...prev,
       accounts: prev.accounts.map((a) =>
@@ -357,7 +274,7 @@ export function useFinance() {
     setState((prev) => {
       const fromAccount = prev.accounts.find((a) => a.id === fromAccountId)
       const toAccount = prev.accounts.find((a) => a.id === toAccountId)
-      
+
       if (!fromAccount || !toAccount) return prev
 
       const transferDescription = description || `Transferencia: ${fromAccount.name} → ${toAccount.name}`
@@ -419,319 +336,6 @@ export function useFinance() {
         ...prev,
         transactions: [zeroTransaction, ...prev.transactions],
       }
-    })
-  }, [])
-
-  // Edit transaction (with optional date change)
-  const editTransaction = useCallback((id: string, amount: number, title: string, accountId?: string, newDate?: Date) => {
-    setState((prev) => ({
-      ...prev,
-      transactions: prev.transactions.map((t) =>
-        t.id === id ? { 
-          ...t, 
-          amount, 
-          title, 
-          accountId,
-          timestamp: newDate || t.timestamp 
-        } : t
-      ),
-    }))
-  }, [])
-
-  // Credit management (Me Deben)
-  const addCredit = useCallback((name: string, amount: number, description?: string) => {
-    const credit: Credit = {
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Deudor',
-      description,
-      amount,
-      originalAmount: amount,
-      createdAt: new Date(),
-      status: 'active',
-    }
-    setState((prev) => ({
-      ...prev,
-      credits: [credit, ...prev.credits],
-    }))
-  }, [])
-
-  const updateCredit = useCallback((id: string, name: string, amount: number, description?: string) => {
-    setState((prev) => ({
-      ...prev,
-      credits: prev.credits.map((c) =>
-        c.id === id ? { ...c, name: name.trim() || 'Deudor', amount, description } : c
-      ),
-    }))
-  }, [])
-
-  const deleteCredit = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      credits: prev.credits.filter((c) => c.id !== id),
-    }))
-  }, [])
-
-  // Collect credit - reduces the amount owed and optionally adds a sale transaction
-  const collectCredit = useCallback((id: string, amountCollected: number, addAsSale: boolean = true, accountId?: string) => {
-    setState((prev) => {
-      const credit = prev.credits.find((c) => c.id === id)
-      if (!credit) return prev
-
-      const newAmount = Math.max(0, credit.amount - amountCollected)
-      const newStatus = newAmount === 0 ? 'collected' : 'partial'
-
-      const updatedCredits = prev.credits.map((c) =>
-        c.id === id ? { ...c, amount: newAmount, status: newStatus as Credit['status'] } : c
-      )
-
-      // Optionally add as a sale transaction
-      const newTransactions = addAsSale
-        ? [
-            {
-              id: crypto.randomUUID(),
-              type: 'sale' as const,
-              amount: amountCollected,
-              title: `Cobro: ${credit.name}`,
-              timestamp: new Date(),
-              accountId,
-            },
-            ...prev.transactions,
-          ]
-        : prev.transactions
-
-      return {
-        ...prev,
-        credits: updatedCredits,
-        transactions: newTransactions,
-      }
-    })
-  }, [])
-
-  // Liability management (Debo)
-  const addLiability = useCallback((name: string, amount: number, dueDay?: number, description?: string) => {
-    const liability: Liability = {
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Acreedor',
-      description,
-      amount,
-      originalAmount: amount,
-      dueDay,
-      createdAt: new Date(),
-      status: 'pending',
-    }
-    setState((prev) => ({
-      ...prev,
-      liabilities: [liability, ...prev.liabilities],
-    }))
-  }, [])
-
-  const updateLiability = useCallback((id: string, name: string, amount: number, dueDay?: number, description?: string) => {
-    setState((prev) => ({
-      ...prev,
-      liabilities: prev.liabilities.map((l) =>
-        l.id === id ? { ...l, name: name.trim() || 'Acreedor', amount, dueDay, description } : l
-      ),
-    }))
-  }, [])
-
-  const deleteLiability = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      liabilities: prev.liabilities.filter((l) => l.id !== id),
-    }))
-  }, [])
-
-  // Pay liability - reduces the amount owed and optionally adds an expense transaction
-  const payLiability = useCallback((id: string, amountPaid: number, addAsExpense: boolean = true, accountId?: string) => {
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-    
-    setState((prev) => {
-      const liability = prev.liabilities.find((l) => l.id === id)
-      if (!liability) return prev
-
-      const newAmount = Math.max(0, liability.amount - amountPaid)
-      const newStatus = newAmount === 0 ? 'paid' : 'partial'
-
-      const updatedLiabilities = prev.liabilities.map((l) =>
-        l.id === id
-          ? { ...l, amount: newAmount, status: newStatus as Liability['status'], paidMonth: newStatus === 'paid' ? currentMonth : l.paidMonth }
-          : l
-      )
-
-      // Optionally add as an expense transaction
-      const newTransactions = addAsExpense
-        ? [
-            {
-              id: crypto.randomUUID(),
-              type: 'expense' as const,
-              amount: amountPaid,
-              title: `Pago: ${liability.name}`,
-              timestamp: new Date(),
-              accountId,
-            },
-            ...prev.transactions,
-          ]
-        : prev.transactions
-
-      return {
-        ...prev,
-        liabilities: updatedLiabilities,
-        transactions: newTransactions,
-      }
-    })
-  }, [])
-
-  // Recurring Debt management (Deudas Recurrentes para Meta Diaria)
-  const addRecurringDebt = useCallback((name: string, amount: number, frequency: PaymentFrequency, dueDay?: number, description?: string) => {
-    const debt: RecurringDebt = {
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Deuda',
-      description,
-      amount,
-      frequency,
-      dueDay,
-      startDate: new Date(),
-      isActive: true,
-    }
-    setState((prev) => ({
-      ...prev,
-      recurringDebts: [debt, ...prev.recurringDebts],
-    }))
-  }, [])
-
-  const updateRecurringDebt = useCallback((id: string, name: string, amount: number, frequency: PaymentFrequency, dueDay?: number, description?: string) => {
-    setState((prev) => ({
-      ...prev,
-      recurringDebts: prev.recurringDebts.map((d) =>
-        d.id === id ? { ...d, name: name.trim() || 'Deuda', amount, frequency, dueDay, description } : d
-      ),
-    }))
-  }, [])
-
-  const deleteRecurringDebt = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      recurringDebts: prev.recurringDebts.filter((d) => d.id !== id),
-    }))
-  }, [])
-
-  const toggleRecurringDebtActive = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      recurringDebts: prev.recurringDebts.map((d) =>
-        d.id === id ? { ...d, isActive: !d.isActive } : d
-      ),
-    }))
-  }, [])
-
-  // Daily Quota Debt management (Cuota Diaria)
-  const addDailyQuotaDebt = useCallback((name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: import('@/lib/types').QuotaFrequency) => {
-    const debt: DailyQuotaDebt = {
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Cuota Diaria',
-      description,
-      totalAmount,
-      totalDays,
-      startDate,
-      isActive: true,
-      frequency: frequency ?? 'daily',
-    }
-    setState((prev) => ({
-      ...prev,
-      dailyQuotaDebts: [debt, ...prev.dailyQuotaDebts],
-    }))
-  }, [])
-
-  const updateDailyQuotaDebt = useCallback((id: string, name: string, totalAmount: number, totalDays: number, startDate: Date, description?: string, frequency?: import('@/lib/types').QuotaFrequency) => {
-    setState((prev) => ({
-      ...prev,
-      dailyQuotaDebts: prev.dailyQuotaDebts.map((d) =>
-        d.id === id ? { ...d, name: name.trim() || 'Cuota Diaria', totalAmount, totalDays, startDate, description, frequency: frequency ?? d.frequency ?? 'daily' } : d
-      ),
-    }))
-  }, [])
-
-  const deleteDailyQuotaDebt = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      dailyQuotaDebts: prev.dailyQuotaDebts.filter((d) => d.id !== id),
-    }))
-  }, [])
-
-  const toggleDailyQuotaDebtActive = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      dailyQuotaDebts: prev.dailyQuotaDebts.map((d) =>
-        d.id === id ? { ...d, isActive: !d.isActive } : d
-      ),
-    }))
-  }, [])
-
-
-  // ── DebtPlan management ──────────────────────────────────────────────
-  const addDebtPlan = useCallback((
-    name: string, totalAmount: number, paymentAmount: number,
-    frequency: PaymentFrequency, dueDay?: number, description?: string
-  ) => {
-    const plan: DebtPlan = {
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Deuda',
-      description,
-      totalAmount,
-      remainingAmount: totalAmount,
-      paymentAmount,
-      frequency,
-      dueDay,
-      startDate: new Date(),
-      isActive: true,
-    }
-    setState((prev) => ({ ...prev, debtPlans: [plan, ...prev.debtPlans] }))
-  }, [])
-
-  const updateDebtPlan = useCallback((
-    id: string, name: string, totalAmount: number, paymentAmount: number,
-    frequency: PaymentFrequency, dueDay?: number, description?: string
-  ) => {
-    setState((prev) => ({
-      ...prev,
-      debtPlans: prev.debtPlans.map((p) =>
-        p.id === id ? { ...p, name: name.trim() || 'Deuda', totalAmount, paymentAmount, frequency, dueDay, description } : p
-      ),
-    }))
-  }, [])
-
-  const deleteDebtPlan = useCallback((id: string) => {
-    setState((prev) => ({ ...prev, debtPlans: prev.debtPlans.filter((p) => p.id !== id) }))
-  }, [])
-
-  const toggleDebtPlanActive = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      debtPlans: prev.debtPlans.map((p) => p.id === id ? { ...p, isActive: !p.isActive } : p),
-    }))
-  }, [])
-
-  const payDebtPlan = useCallback((id: string, addAsExpense = true, accountId?: string) => {
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-    setState((prev) => {
-      const plan = prev.debtPlans.find((p) => p.id === id)
-      if (!plan) return prev
-      const newRemaining = Math.max(0, plan.remainingAmount - plan.paymentAmount)
-      const updatedPlans = prev.debtPlans.map((p) =>
-        p.id === id ? { ...p, remainingAmount: newRemaining, paidMonth: currentMonth } : p
-      )
-      const newTransactions = addAsExpense ? [
-        {
-          id: crypto.randomUUID(),
-          type: 'expense' as const,
-          amount: plan.paymentAmount,
-          title: `Abono: ${plan.name}`,
-          timestamp: new Date(),
-          accountId,
-        },
-        ...prev.transactions,
-      ] : prev.transactions
-      return { ...prev, debtPlans: updatedPlans, transactions: newTransactions }
     })
   }, [])
 
@@ -801,9 +405,6 @@ export function useFinance() {
   }, [state])
 
   // Calculations
-  const totalFixedExpenses = state.fixedExpenses.reduce((sum, e) => sum + e.amount, 0)
-  const unpaidFixedExpenses = state.fixedExpenses.filter((e) => !e.isPaid).reduce((sum, e) => sum + e.amount, 0)
-  
   const shiftStartHour = state.settings.shiftStartHour ?? 0
 
   const getShiftStart = (date: Date): Date => {
@@ -842,7 +443,6 @@ export function useFinance() {
 
   // Identify internal/adjustment transactions that should NOT count toward totals
   // These are transfers between accounts, balance adjustments, and resets
-  // Fixed: Now detects ANY transfer (↗/↙ prefix) regardless of custom description
   const isInternalTransaction = (title: string) => {
     return title.startsWith('↗ ') ||  // Any outgoing transfer
            title.startsWith('↙ ') ||  // Any incoming transfer
@@ -862,7 +462,7 @@ export function useFinance() {
 
   // Platform breakdown for today's income
   const todayPlatformBreakdown = useMemo(() => {
-    const breakdown: Record<string, number> = {
+    const breakdown: PlatformBreakdown = {
       uber: 0,
       indriver: 0,
       cabify: 0,
@@ -871,7 +471,7 @@ export function useFinance() {
       corporate: 0,
       other: 0,
     }
-    
+
     todayTransactions
       .filter((t) => t.type === 'sale' && !isInternalTransaction(t.title))
       .forEach((t) => {
@@ -883,7 +483,7 @@ export function useFinance() {
           breakdown.other += t.amount
         }
       })
-    
+
     return breakdown
   }, [todayTransactions])
 
@@ -897,220 +497,6 @@ export function useFinance() {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const netIncome = monthSales - monthExpenses
-  const coverageAmount = netIncome
-  
-  // Dynamic coverage: only count UNPAID fixed expenses for the goal
-  // When you pay an expense, the goal decreases immediately
-  const coveragePercent = unpaidFixedExpenses > 0 
-    ? Math.min(100, Math.max(0, (coverageAmount / unpaidFixedExpenses) * 100))
-    : coverageAmount >= 0 ? 100 : 0 // If all paid, you're 100% covered
-  
-  // Shortfall is based on unpaid expenses only - this is the "Descent Effect"
-  const shortfall = Math.max(0, unpaidFixedExpenses - coverageAmount)
-
-  // Calculate working days in month
-  const currentDate = new Date()
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
-  
-  // Count remaining working days (excluding non-working days)
-  const getRemainingWorkingDays = useMemo(() => {
-    const nonWorkingDays = state.settings.nonWorkingDays || []
-    let workingDays = 0
-    for (let day = currentDate.getDate(); day <= daysInMonth; day++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-      if (!nonWorkingDays.includes(date.getDay())) {
-        workingDays++
-      }
-    }
-    return workingDays
-  }, [currentDate, daysInMonth, state.settings.nonWorkingDays])
-
-  // Check if today is a non-working day
-  const isTodayRestDay = useMemo(() => {
-    const nonWorkingDays = state.settings.nonWorkingDays || []
-    return nonWorkingDays.includes(currentDate.getDay())
-  }, [currentDate, state.settings.nonWorkingDays])
-
-  // Calculate daily proration of recurring debts
-  const calculateDailyDebtPortion = useMemo(() => {
-    const activeDebts = state.recurringDebts.filter((d) => d.isActive)
-    let dailyTotal = 0
-
-    activeDebts.forEach((debt) => {
-      switch (debt.frequency) {
-        case 'daily':
-          // Daily debt adds full amount each day
-          dailyTotal += debt.amount
-          break
-        case 'weekly':
-          // Weekly debt: divide by 7 days
-          dailyTotal += debt.amount / 7
-          break
-        case 'biweekly':
-          // Biweekly debt: divide by 14 days
-          dailyTotal += debt.amount / 14
-          break
-        case 'monthly':
-          // Monthly debt: divide by days in current month
-          dailyTotal += debt.amount / daysInMonth
-          break
-      }
-    })
-
-    return Math.ceil(dailyTotal)
-  }, [state.recurringDebts, daysInMonth])
-
-  // Calculate total daily quota debt portion (Cuota Diaria)
-  const calculateDailyQuotaPortion = useMemo(() => {
-    const activeQuotas = state.dailyQuotaDebts.filter((d) => d.isActive)
-    let dailyTotal = 0
-
-    activeQuotas.forEach((quota) => {
-      const startDate = new Date(quota.startDate)
-      startDate.setHours(0, 0, 0, 0)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-
-      const isWeekly = quota.frequency === 'weekly'
-      const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-      const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
-
-      // Only add if still within payment period
-      if (periodsPassed < quota.totalDays) {
-        const dailyContribution = isWeekly
-          ? quota.totalAmount / quota.totalDays / 7
-          : quota.totalAmount / quota.totalDays
-        dailyTotal += dailyContribution
-      }
-    })
-
-    return Math.ceil(dailyTotal)
-  }, [state.dailyQuotaDebts])
-
-  // Get quota debt details (periods passed, remaining, progress)
-  const getDailyQuotaDetails = useCallback((quota: DailyQuotaDebt) => {
-    const startDate = new Date(quota.startDate)
-    startDate.setHours(0, 0, 0, 0)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const isWeekly = quota.frequency === 'weekly'
-    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
-    const periodsRemaining = Math.max(0, quota.totalDays - periodsPassed)
-    const quotaPerPeriod = quota.totalAmount / quota.totalDays
-    const dailyQuota = isWeekly ? quotaPerPeriod / 7 : quotaPerPeriod
-    const amountPaid = Math.min(quotaPerPeriod * periodsPassed, quota.totalAmount)
-    const amountRemaining = quota.totalAmount - amountPaid
-    const progressPercent = Math.min(100, (periodsPassed / quota.totalDays) * 100)
-    const isCompleted = periodsPassed >= quota.totalDays
-
-    return {
-      daysPassed: Math.max(0, periodsPassed),
-      daysRemaining: periodsRemaining,
-      dailyQuota: Math.ceil(dailyQuota),
-      amountPaid: Math.ceil(amountPaid),
-      amountRemaining: Math.ceil(amountRemaining),
-      progressPercent,
-      isCompleted,
-    }
-  }, [])
-
-  // Total monthly equivalent of recurring debts (for expense display)
-  const totalMonthlyRecurringDebts = useMemo(() => {
-    const activeDebts = state.recurringDebts.filter((d) => d.isActive)
-    let monthlyTotal = 0
-
-    activeDebts.forEach((debt) => {
-      switch (debt.frequency) {
-        case 'daily':
-          monthlyTotal += debt.amount * daysInMonth
-          break
-        case 'weekly':
-          monthlyTotal += debt.amount * (daysInMonth / 7)
-          break
-        case 'biweekly':
-          monthlyTotal += debt.amount * (daysInMonth / 14)
-          break
-        case 'monthly':
-          monthlyTotal += debt.amount
-          break
-      }
-    })
-
-    return Math.ceil(monthlyTotal)
-  }, [state.recurringDebts, daysInMonth])
-
-
-  // Daily contribution from DebtPlans
-  const calculateDebtPlanDailyPortion = useMemo(() => {
-    const active = state.debtPlans.filter((p) => p.isActive && p.remainingAmount > 0)
-    let total = 0
-    active.forEach((p) => {
-      switch (p.frequency) {
-        case 'daily':    total += p.paymentAmount; break
-        case 'weekly':   total += p.paymentAmount / 7; break
-        case 'biweekly': total += p.paymentAmount / 14; break
-        case 'monthly':  total += p.paymentAmount / daysInMonth; break
-      }
-    })
-    return Math.ceil(total)
-  }, [state.debtPlans, daysInMonth])
-
-  // Upcoming debt plan payments
-  const upcomingDebtPayments = useMemo(() => {
-    const currentDay = currentDate.getDate()
-    const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
-    return state.debtPlans
-      .filter((p) => p.isActive && p.remainingAmount > 0 && p.dueDay && p.paidMonth !== currentMonth)
-      .map((p) => {
-        const daysUntil = (p.dueDay ?? 0) - currentDay
-        return { ...p, daysUntil }
-      })
-      .sort((a, b) => a.daysUntil - b.daysUntil)
-  }, [state.debtPlans, currentDate])
-
-  // ROLLOVER: full quota amount owed for each non-expired active quota
-  const quotaObligationsTotal = useMemo(() => {
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    return state.dailyQuotaDebts.filter((q) => q.isActive).reduce((sum, q) => {
-      const start = new Date(q.startDate)
-      start.setHours(0, 0, 0, 0)
-      const isWeekly = q.frequency === 'weekly'
-      const daysPassed = Math.floor((todayStart.getTime() - start.getTime()) / 86400000)
-      const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
-      if (periodsPassed >= q.totalDays) return sum
-      return sum + q.totalAmount
-    }, 0)
-  }, [state.dailyQuotaDebts])
-
-  // ROLLOVER: what's still owed this month for each active debt plan
-  const debtPlanObligationsTotal = useMemo(() => {
-    const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
-    return state.debtPlans.filter((p) => p.isActive && p.remainingAmount > 0).reduce((sum, p) => {
-      let monthly: number
-      switch (p.frequency) {
-        case 'monthly':  monthly = p.paidMonth === currentMonthStr ? 0 : p.paymentAmount; break
-        case 'weekly':   monthly = p.paymentAmount * (daysInMonth / 7); break
-        case 'biweekly': monthly = p.paymentAmount * (daysInMonth / 14); break
-        case 'daily':    monthly = p.paymentAmount * daysInMonth; break
-        default:         monthly = p.paymentAmount
-      }
-      return sum + Math.min(Math.ceil(monthly), p.remainingAmount)
-    }, 0)
-  }, [state.debtPlans, currentDate, daysInMonth])
-
-  // ROLLOVER: unified total remaining obligation vs actual income earned
-  // When income is low one day, tomorrow's target automatically rises to compensate
-  const totalRemainingObligation = unpaidFixedExpenses + totalMonthlyRecurringDebts + quotaObligationsTotal + debtPlanObligationsTotal
-  const totalShortfall = Math.max(0, totalRemainingObligation - netIncome)
-  const dailyTarget = getRemainingWorkingDays > 0 ? Math.ceil(totalShortfall / getRemainingWorkingDays) : 0
-
-  // Raw daily for fixed expenses (used in breakdown display, before income offset)
-  const baseShortfallDaily = getRemainingWorkingDays > 0 && unpaidFixedExpenses > 0
-    ? Math.ceil(unpaidFixedExpenses / getRemainingWorkingDays)
-    : 0
 
   // Calculate account balances with income/expense breakdown
   const accountBalances = useMemo(() => {
@@ -1148,30 +534,6 @@ export function useFinance() {
     return breakdown
   }, [state.transactions, state.accounts])
 
-  // Get upcoming payments (sorted by due date proximity)
-  const upcomingPayments = useMemo(() => {
-    const currentDay = currentDate.getDate()
-    const unpaid = state.fixedExpenses
-      .filter((e) => !e.isPaid && e.dueDay)
-      .map((e) => {
-        const dueDay = e.dueDay!
-        // Calculate days until due (considering month wrap)
-        let daysUntil = dueDay - currentDay
-        if (daysUntil < 0) {
-          // Already passed this month, count as overdue (negative)
-          daysUntil = daysUntil
-        }
-        return { ...e, daysUntil }
-      })
-      .sort((a, b) => {
-        // Overdue first (negative), then by closest due date
-        if (a.daysUntil < 0 && b.daysUntil >= 0) return -1
-        if (b.daysUntil < 0 && a.daysUntil >= 0) return 1
-        return a.daysUntil - b.daysUntil
-      })
-    return unpaid.slice(0, 3)
-  }, [state.fixedExpenses, currentDate])
-
   // Currency formatting helper
   const formatCurrency = useCallback((amount: number) => {
     const symbol = state.settings.currencySymbol || '$'
@@ -1180,27 +542,6 @@ export function useFinance() {
       maximumFractionDigits: 0,
     }).format(amount)}`
   }, [state.settings.currencySymbol])
-
-  // Credits and Liabilities calculations
-  const totalCredits = useMemo(() => 
-    state.credits.filter(c => c.status !== 'collected').reduce((sum, c) => sum + c.amount, 0),
-    [state.credits]
-  )
-
-  const totalLiabilities = useMemo(() => 
-    state.liabilities.filter(l => l.status !== 'paid').reduce((sum, l) => sum + l.amount, 0),
-    [state.liabilities]
-  )
-
-  const activeCredits = useMemo(() => 
-    state.credits.filter(c => c.status !== 'collected'),
-    [state.credits]
-  )
-
-  const activeLiabilities = useMemo(() => 
-    state.liabilities.filter(l => l.status !== 'paid'),
-    [state.liabilities]
-  )
 
   return {
     state,
@@ -1214,44 +555,18 @@ export function useFinance() {
     addTransaction,
     deleteTransaction,
     editTransaction,
-    addFixedExpense,
-    updateFixedExpense,
-    deleteFixedExpense,
-    toggleExpensePaid,
     addAccount,
     updateAccount,
     deleteAccount,
     adjustAccountBalance,
     transferBetweenAccounts,
     resetAccountBalance,
-    // Credit management (Me Deben)
-    addCredit,
-    updateCredit,
-    deleteCredit,
-    collectCredit,
-    // Liability management (Debo)
-    addLiability,
-    updateLiability,
-    deleteLiability,
-    payLiability,
-    // Recurring debt management
-    addRecurringDebt,
-    updateRecurringDebt,
-    deleteRecurringDebt,
-    toggleRecurringDebtActive,
-    // Daily quota debt management
-    addDailyQuotaDebt,
-    updateDailyQuotaDebt,
-    deleteDailyQuotaDebt,
-    toggleDailyQuotaDebtActive,
-    getDailyQuotaDetails,
-    setMonthlyIncome,
+    dailyGoal: state.dailyGoal,
+    setDailyGoal,
     updateSettings,
     clearAllData,
     formatCurrency,
     // Calculated values
-    totalFixedExpenses,
-    unpaidFixedExpenses,
     todayTransactions,
     monthTransactions,
     todaySales,
@@ -1260,41 +575,10 @@ export function useFinance() {
     monthSales,
     monthExpenses,
     netIncome,
-    coverageAmount,
-    coveragePercent,
-    shortfall,
-    dailyTarget,
     accountBalances,
     accountBreakdown,
-    upcomingPayments,
-    isTodayRestDay,
-    getRemainingWorkingDays,
-    // Credits and Liabilities
-    totalCredits,
-    totalLiabilities,
-    activeCredits,
-    activeLiabilities,
-    // Recurring debts
-    calculateDailyDebtPortion,
-    totalMonthlyRecurringDebts,
-    activeRecurringDebts: state.recurringDebts.filter((d) => d.isActive),
-    // Daily quota debts
-    calculateDailyQuotaPortion,
-    activeDailyQuotaDebts: state.dailyQuotaDebts.filter((d) => d.isActive),
     // Platform breakdown
     todayPlatformBreakdown,
-    baseShortfallDaily,
-    quotaObligationsTotal,
-    debtPlanObligationsTotal,
-    // Debt plans
-    addDebtPlan,
-    updateDebtPlan,
-    deleteDebtPlan,
-    toggleDebtPlanActive,
-    payDebtPlan,
-    calculateDebtPlanDailyPortion,
-    upcomingDebtPayments,
-    debtPlans: state.debtPlans,
     // Shift management
     currentShift: state.currentShift,
     isShiftActive: !!state.currentShift,

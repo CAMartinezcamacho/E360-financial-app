@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Download,
   Smartphone,
@@ -15,11 +14,10 @@ import {
   Coins,
   Check,
   FileSpreadsheet,
-  CalendarDays,
   Bell,
 } from 'lucide-react'
 import { downloadReport } from '@/lib/export'
-import type { Transaction, FixedExpense } from '@/lib/types'
+import type { Transaction } from '@/lib/types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,25 +62,14 @@ const currencyOptions = [
   { value: '€', label: '€ (Euro)' },
 ]
 
-const weekDays = [
-  { value: 0, label: 'Domingo', short: 'Dom' },
-  { value: 1, label: 'Lunes', short: 'Lun' },
-  { value: 2, label: 'Martes', short: 'Mar' },
-  { value: 3, label: 'Miercoles', short: 'Mie' },
-  { value: 4, label: 'Jueves', short: 'Jue' },
-  { value: 5, label: 'Viernes', short: 'Vie' },
-  { value: 6, label: 'Sabado', short: 'Sab' },
-]
-
 interface SettingsPanelProps {
   settings: UserSettings
   onUpdateSettings: (settings: Partial<UserSettings>) => void
   onClearData: () => void
   transactions: Transaction[]
-  fixedExpenses: FixedExpense[]
 }
 
-export function SettingsPanel({ settings, onUpdateSettings, onClearData, transactions, fixedExpenses }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onUpdateSettings, onClearData, transactions }: SettingsPanelProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstallable, setIsInstallable] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -96,8 +83,6 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
       setNotifPermission(Notification.permission)
     }
   }, [])
-
-  const nonWorkingDays = settings.nonWorkingDays || []
 
   useEffect(() => {
     // Check if already installed
@@ -166,7 +151,7 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
   }
 
   const handleExport = () => {
-    downloadReport(transactions, fixedExpenses, settings.currencySymbol)
+    downloadReport(transactions, settings.currencySymbol)
   }
 
   const handleToggleNotifications = async () => {
@@ -182,24 +167,6 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
       if (result !== 'granted') return
     }
     onUpdateSettings({ notificationsEnabled: true })
-  }
-
-  const toggleNonWorkingDay = (day: number) => {
-    const newNonWorkingDays = nonWorkingDays.includes(day)
-      ? nonWorkingDays.filter((d) => d !== day)
-      : [...nonWorkingDays, day]
-    onUpdateSettings({ nonWorkingDays: newNonWorkingDays })
-  }
-
-  // Calculate working days this month
-  const today = new Date()
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  let workingDaysInMonth = 0
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(today.getFullYear(), today.getMonth(), day)
-    if (!nonWorkingDays.includes(date.getDay())) {
-      workingDaysInMonth++
-    }
   }
 
   return (
@@ -232,54 +199,6 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
             </div>
             <p className="text-xs text-muted-foreground">
               Aparecera como saludo en la pantalla principal
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Dias Laborales */}
-      <Card className="border-0 shadow-sm bg-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" />
-            Dias Laborales
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            Selecciona los dias que NO trabajas. La meta diaria se calculara solo con tus dias laborales.
-          </p>
-          
-          <div className="grid grid-cols-7 gap-1">
-            {weekDays.map((day) => {
-              const isNonWorking = nonWorkingDays.includes(day.value)
-              return (
-                <button
-                  key={day.value}
-                  onClick={() => toggleNonWorkingDay(day.value)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
-                    isNonWorking 
-                      ? 'bg-muted text-muted-foreground' 
-                      : 'bg-accent/10 text-accent border border-accent/30'
-                  }`}
-                >
-                  <span className="text-xs font-medium">{day.short}</span>
-                  {isNonWorking ? (
-                    <span className="text-[10px] text-muted-foreground">Libre</span>
-                  ) : (
-                    <span className="text-[10px] text-accent">Laboral</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="p-3 rounded-xl bg-secondary/50 border border-border">
-            <p className="text-sm text-foreground">
-              Este mes tienes <span className="font-bold text-accent">{workingDaysInMonth} dias laborales</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tu meta diaria se divide entre estos dias para que puedas descansar sin perder el ritmo.
             </p>
           </div>
         </CardContent>
@@ -424,7 +343,7 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Descarga un reporte CSV con todas tus transacciones y gastos fijos.
+            Descarga un reporte CSV con todas tus transacciones.
           </p>
           <Button
             className="w-full h-12 bg-secondary hover:bg-secondary/80 text-foreground active:scale-95"
@@ -500,7 +419,7 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
               <AlertDialogHeader>
                 <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta accion eliminara permanentemente todas tus transacciones, gastos fijos y configuraciones. Esta accion no se puede deshacer.
+                  Esta accion eliminara permanentemente todas tus transacciones, cuentas y configuraciones. Esta accion no se puede deshacer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -521,7 +440,7 @@ export function SettingsPanel({ settings, onUpdateSettings, onClearData, transac
       <Card className="border-0 shadow-sm bg-card">
         <CardContent className="p-4">
           <p className="text-xs text-muted-foreground text-center">
-            <span className="text-accent font-semibold">Enfoque 360</span> v2.0 - Tus datos se guardan localmente en tu dispositivo.
+            <span className="text-accent font-semibold">Enfoque 360</span> v2.0 - Tus datos se guardan en tu dispositivo y se sincronizan en la nube.
           </p>
         </CardContent>
       </Card>

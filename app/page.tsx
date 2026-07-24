@@ -3,28 +3,24 @@
 import { useState, useEffect } from 'react'
 import { useFinance } from '@/hooks/use-finance'
 import { TransactionFeed } from '@/components/transaction-feed'
-import { FixedExpenses } from '@/components/fixed-expenses'
 import { ServiceEntry } from '@/components/service-entry'
 import { BottomNav } from '@/components/bottom-nav'
 import { SettingsPanel } from '@/components/settings-panel'
 import { HistoryPanel } from '@/components/history-panel'
-import { UpcomingPayments } from '@/components/upcoming-payments'
 import { AccountBalances } from '@/components/account-balances'
-import { CreditsPanel } from '@/components/credits-panel'
-import { DailyQuotaDebts } from '@/components/daily-quota-debts'
 import { DailyChart } from '@/components/daily-chart'
 import { HourlyChart } from '@/components/hourly-chart'
 import { QuickEntry } from '@/components/quick-entry'
 import { MonthlySummary } from '@/components/monthly-summary'
-import { DebtPlans } from '@/components/debt-plans'
 import { ShiftSummaryModal } from '@/components/shift-summary'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Minus, ChevronDown, ChevronUp, Info, Play, Square, Zap, Navigation } from 'lucide-react'
+import { Minus, Play, Square, Zap, Navigation, Pencil, Check, X } from 'lucide-react'
 import { Onboarding } from '@/components/onboarding'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useGpsTracking } from '@/hooks/use-gps-tracking'
 import { setSyncKey } from '@/lib/cloud-sync'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import type { ShiftSummary } from '@/lib/types'
 
-type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
+type TabType = 'hoy' | 'historial' | 'cuentas' | 'ajustes'
 
 function ElapsedTime({ startTime }: { startTime: Date }) {
   const [, setTick] = useState(0)
@@ -55,7 +51,8 @@ export default function FinanceDashboard() {
   const [entryType, setEntryType] = useState<'sale' | 'expense' | null>(null)
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('hoy')
-  const [showBreakdown, setShowBreakdown] = useState(false)
+  const [isEditingGoal, setIsEditingGoal] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
   const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null)
   const [shiftGpsKm, setShiftGpsKm] = useState(0)
   const [confirmEndShift, setConfirmEndShift] = useState(false)
@@ -70,34 +67,17 @@ export default function FinanceDashboard() {
     addTransaction,
     deleteTransaction,
     editTransaction,
-    addFixedExpense,
-    updateFixedExpense,
-    deleteFixedExpense,
-    toggleExpensePaid,
     addAccount,
     updateAccount,
     deleteAccount,
     adjustAccountBalance,
     transferBetweenAccounts,
     resetAccountBalance,
-    addCredit,
-    updateCredit,
-    deleteCredit,
-    collectCredit,
-    addLiability,
-    updateLiability,
-    deleteLiability,
-    payLiability,
-    addDailyQuotaDebt,
-    updateDailyQuotaDebt,
-    deleteDailyQuotaDebt,
-    toggleDailyQuotaDebtActive,
-    getDailyQuotaDetails,
+    dailyGoal,
+    setDailyGoal,
     updateSettings,
     clearAllData,
     formatCurrency,
-    totalFixedExpenses,
-    unpaidFixedExpenses,
     todayTransactions,
     todaySales,
     todayExpenses,
@@ -105,31 +85,9 @@ export default function FinanceDashboard() {
     monthSales,
     monthExpenses,
     netIncome,
-    coveragePercent,
-    shortfall,
-    dailyTarget,
     accountBalances,
     accountBreakdown,
-    upcomingPayments,
-    isTodayRestDay,
-    getRemainingWorkingDays,
     monthTransactions,
-    totalCredits,
-    totalLiabilities,
-    activeCredits,
-    activeLiabilities,
-    calculateDailyDebtPortion,
-    baseShortfallDaily,
-    totalMonthlyRecurringDebts,
-    addDebtPlan,
-    updateDebtPlan,
-    deleteDebtPlan,
-    toggleDebtPlanActive,
-    payDebtPlan,
-    calculateDebtPlanDailyPortion,
-    debtPlans,
-    calculateDailyQuotaPortion,
-    activeDailyQuotaDebts,
     isShiftActive,
     currentShift,
     startShift,
@@ -149,7 +107,7 @@ export default function FinanceDashboard() {
       <Onboarding
         onComplete={(name, currency, syncKey, restoredState) => {
           setSyncKey(syncKey)
-          completeOnboarding(name, currency, [0], restoredState)
+          completeOnboarding(name, currency, restoredState)
         }}
       />
     )
@@ -172,15 +130,11 @@ export default function FinanceDashboard() {
       t.type === 'sale' &&
       !t.title.startsWith('↗ ') &&
       !t.title.startsWith('↙ ') &&
-      !t.title.startsWith('Cobro:') &&
       !t.title.startsWith('Ajuste:') &&
       !t.title.startsWith('Reinicio de saldo')
   ).length
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
-  const currentMonthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-  const breakdownTodayStart = new Date(); breakdownTodayStart.setHours(0, 0, 0, 0)
-  const missing = Math.max(0, dailyTarget - todaySales)
-  const progressPercent = dailyTarget > 0 ? Math.min(100, (todaySales / dailyTarget) * 100) : 0
+  const missing = Math.max(0, dailyGoal - todaySales)
+  const progressPercent = dailyGoal > 0 ? Math.min(100, (todaySales / dailyGoal) * 100) : 0
 
   const handleEndShift = () => {
     const summary = endShift()
@@ -193,6 +147,17 @@ export default function FinanceDashboard() {
   const handleConfirmEndShift = () => {
     setConfirmEndShift(false)
     handleEndShift()
+  }
+
+  const startEditingGoal = () => {
+    setGoalInput(dailyGoal > 0 ? String(dailyGoal) : '')
+    setIsEditingGoal(true)
+  }
+
+  const saveGoal = () => {
+    const parsed = parseFloat(goalInput)
+    setDailyGoal(isNaN(parsed) ? 0 : parsed)
+    setIsEditingGoal(false)
   }
 
   return (
@@ -251,25 +216,43 @@ export default function FinanceDashboard() {
             )}
 
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-              <button className="w-full text-left" onClick={() => setShowBreakdown((v) => !v)}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      {isTodayRestDay
-                        ? 'Día de descanso'
-                        : `Meta diaria · ${getRemainingWorkingDays} día${getRemainingWorkingDays !== 1 ? 's' : ''} restante${getRemainingWorkingDays !== 1 ? 's' : ''}`}
-                    </p>
-                    <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyTarget)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-                    <Info className="w-3.5 h-3.5" />
-                    {showBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </div>
+              {isEditingGoal ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    autoFocus
+                    value={goalInput}
+                    onChange={(e) => setGoalInput(e.target.value)}
+                    placeholder="Meta de hoy"
+                    className="h-11 text-lg"
+                    onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
+                  />
+                  <Button size="icon" className="w-11 h-11 shrink-0" onClick={saveGoal}>
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="w-11 h-11 shrink-0"
+                    onClick={() => setIsEditingGoal(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-              </button>
+              ) : (
+                <button className="w-full text-left" onClick={startEditingGoal}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Meta de hoy</p>
+                      <p className="text-3xl font-semibold mt-0.5">{formatCurrency(dailyGoal)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Llevás {formatCurrency(todaySales)} · {progressPercent.toFixed(0)}%
+                      </p>
+                    </div>
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground mt-1" />
+                  </div>
+                </button>
+              )}
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
@@ -280,65 +263,6 @@ export default function FinanceDashboard() {
                   }}
                 />
               </div>
-              {showBreakdown && (
-                <div className="rounded-xl bg-muted/60 border border-border divide-y divide-border text-xs overflow-hidden">
-                  {baseShortfallDaily > 0 && (
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-muted-foreground">Gastos fijos</span>
-                      <span className="font-semibold">{formatCurrency(baseShortfallDaily)}</span>
-                    </div>
-                  )}
-                  {totalMonthlyRecurringDebts > 0 && getRemainingWorkingDays > 0 && (
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-muted-foreground">Deudas recurrentes</span>
-                      <span className="font-semibold">{formatCurrency(Math.ceil(totalMonthlyRecurringDebts / getRemainingWorkingDays))}</span>
-                    </div>
-                  )}
-                  {debtPlans.filter(p => p.isActive && p.remainingAmount > 0).map(p => {
-                    let monthly: number
-                    switch (p.frequency) {
-                      case 'monthly':  monthly = p.paidMonth === currentMonthStr ? 0 : p.paymentAmount; break
-                      case 'weekly':   monthly = p.paymentAmount * (daysInMonth / 7); break
-                      case 'biweekly': monthly = p.paymentAmount * (daysInMonth / 14); break
-                      case 'daily':    monthly = p.paymentAmount * daysInMonth; break
-                      default:         monthly = p.paymentAmount
-                    }
-                    const obligation = Math.min(Math.ceil(monthly), p.remainingAmount)
-                    const daily = getRemainingWorkingDays > 0 ? Math.ceil(obligation / getRemainingWorkingDays) : 0
-                    if (daily === 0) return null
-                    return (
-                      <div key={p.id} className="flex justify-between items-center px-3 py-2">
-                        <span className="text-muted-foreground truncate max-w-[60%]">Abono: {p.name}</span>
-                        <span className="font-semibold">{formatCurrency(daily)}</span>
-                      </div>
-                    )
-                  })}
-                  {activeDailyQuotaDebts.filter(q => q.isActive).map(q => {
-                    const start = new Date(q.startDate); start.setHours(0, 0, 0, 0)
-                    const isWeekly = q.frequency === 'weekly'
-                    const daysPassed = Math.floor((breakdownTodayStart.getTime() - start.getTime()) / 86400000)
-                    const periodsPassed = isWeekly ? Math.floor(daysPassed / 7) : daysPassed
-                    if (periodsPassed >= q.totalDays) return null
-                    const daily = getRemainingWorkingDays > 0 ? Math.ceil(q.totalAmount / getRemainingWorkingDays) : 0
-                    return (
-                      <div key={q.id} className="flex justify-between items-center px-3 py-2">
-                        <span className="text-muted-foreground truncate max-w-[60%]">Cuota: {q.name}</span>
-                        <span className="font-semibold">{formatCurrency(daily)}</span>
-                      </div>
-                    )
-                  })}
-                  {netIncome > 0 && getRemainingWorkingDays > 0 && (
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-muted-foreground">Ya ganado este mes</span>
-                      <span className="font-semibold text-green-600">-{formatCurrency(Math.floor(netIncome / getRemainingWorkingDays))}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center px-3 py-2 bg-muted">
-                    <span className="font-semibold">Total meta</span>
-                    <span className="font-bold text-primary">{formatCurrency(dailyTarget)}</span>
-                  </div>
-                </div>
-              )}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-[10px] text-muted-foreground">Viajes</p>
@@ -371,8 +295,6 @@ export default function FinanceDashboard() {
                 </Button>
               </div>
             </div>
-
-            <UpcomingPayments payments={upcomingPayments} formatCurrency={formatCurrency} />
 
             <TransactionFeed
               transactions={todayTransactions}
@@ -412,68 +334,20 @@ export default function FinanceDashboard() {
           </>
         )}
 
-        {activeTab === 'deudas' && (
-          <>
-            <FixedExpenses
-              expenses={state.fixedExpenses}
-              totalExpenses={totalFixedExpenses}
-              unpaidTotal={unpaidFixedExpenses}
-              onAdd={addFixedExpense}
-              onUpdate={updateFixedExpense}
-              onDelete={deleteFixedExpense}
-              onTogglePaid={toggleExpensePaid}
-              formatCurrency={formatCurrency}
-            />
-            <DebtPlans
-              plans={debtPlans}
-              dailyPortion={calculateDebtPlanDailyPortion}
-              onAdd={addDebtPlan}
-              onUpdate={updateDebtPlan}
-              onDelete={deleteDebtPlan}
-              onToggleActive={toggleDebtPlanActive}
-              onPay={payDebtPlan}
-              formatCurrency={formatCurrency}
-            />
-            <DailyQuotaDebts
-              debts={state.dailyQuotaDebts}
-              dailyQuotaPortion={calculateDailyQuotaPortion}
-              onAdd={addDailyQuotaDebt}
-              onUpdate={updateDailyQuotaDebt}
-              onDelete={deleteDailyQuotaDebt}
-              onToggleActive={toggleDailyQuotaDebtActive}
-              getDetails={getDailyQuotaDetails}
-              formatCurrency={formatCurrency}
-            />
-            <CreditsPanel
-              credits={activeCredits}
-              liabilities={activeLiabilities}
-              accounts={state.accounts}
-              totalCredits={totalCredits}
-              totalLiabilities={totalLiabilities}
-              formatCurrency={formatCurrency}
-              onAddCredit={addCredit}
-              onUpdateCredit={updateCredit}
-              onDeleteCredit={deleteCredit}
-              onCollectCredit={collectCredit}
-              onAddLiability={addLiability}
-              onUpdateLiability={updateLiability}
-              onDeleteLiability={deleteLiability}
-              onPayLiability={payLiability}
-            />
-            <AccountBalances
-              accounts={state.accounts}
-              balances={accountBalances}
-              breakdown={accountBreakdown}
-              transactions={state.transactions}
-              onAdd={addAccount}
-              onUpdate={updateAccount}
-              onDelete={deleteAccount}
-              onAdjustBalance={adjustAccountBalance}
-              onTransfer={transferBetweenAccounts}
-              onResetBalance={resetAccountBalance}
-              formatCurrency={formatCurrency}
-            />
-          </>
+        {activeTab === 'cuentas' && (
+          <AccountBalances
+            accounts={state.accounts}
+            balances={accountBalances}
+            breakdown={accountBreakdown}
+            transactions={state.transactions}
+            onAdd={addAccount}
+            onUpdate={updateAccount}
+            onDelete={deleteAccount}
+            onAdjustBalance={adjustAccountBalance}
+            onTransfer={transferBetweenAccounts}
+            onResetBalance={resetAccountBalance}
+            formatCurrency={formatCurrency}
+          />
         )}
 
         {activeTab === 'ajustes' && (
@@ -482,7 +356,6 @@ export default function FinanceDashboard() {
             onUpdateSettings={updateSettings}
             onClearData={clearAllData}
             transactions={state.transactions}
-            fixedExpenses={state.fixedExpenses}
           />
         )}
       </main>

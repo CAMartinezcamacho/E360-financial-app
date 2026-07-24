@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { setSyncKey, loadFromCloud } from '@/lib/cloud-sync'
-import { CalendarDays, Zap, CreditCard, Settings, ChevronRight, RefreshCw } from 'lucide-react'
+import { CalendarDays, Zap, TrendingUp, Settings, ChevronRight, RefreshCw } from 'lucide-react'
 
 interface OnboardingProps {
   onComplete: (name: string, currency: string, syncKey: string, restoredState?: object | null) => void
@@ -18,25 +18,16 @@ const CURRENCIES = [
   { symbol: 'Bs', label: 'Bolívar / Boliviano' },
 ]
 
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
   const [syncKey, setSyncKeyState] = useState('')
   const [currency, setCurrency] = useState('$')
   const [customCurrency, setCustomCurrency] = useState('')
-  const [restDays, setRestDays] = useState<number[]>([0])
   const [loading, setLoading] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'found' | 'notfound' | 'error'>('idle')
 
   const finalCurrency = currency === 'custom' ? customCurrency : currency
-
-  const toggleRestDay = (day: number) => {
-    setRestDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    )
-  }
 
   const handleSyncKeyCheck = async () => {
     if (!syncKey.trim()) return
@@ -150,27 +141,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
     </div>,
 
-    // Step 2 — Rest days + sync key
+    // Step 2 — Sync key
     <div key="setup" className="space-y-5">
       <div>
-        <h2 className="text-xl font-semibold">Días de descanso</h2>
-        <p className="text-sm text-muted-foreground mt-1">Estos días no cuentan para la meta diaria.</p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {DAYS.map((day, i) => (
-          <button
-            key={i}
-            onClick={() => toggleRestDay(i)}
-            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-              restDays.includes(i)
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card border-border text-foreground'
-            }`}
-          >
-            {day}
-          </button>
-        ))}
+        <h2 className="text-xl font-semibold">Sincronización</h2>
+        <p className="text-sm text-muted-foreground mt-1">Conecta tus datos con la nube.</p>
       </div>
 
       <div className="space-y-2 pt-2">
@@ -243,8 +218,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <div className="mt-8 grid grid-cols-2 gap-3">
             {[
               { icon: <Zap className="w-4 h-4" />, text: 'Registrá viajes en segundos' },
-              { icon: <CalendarDays className="w-4 h-4" />, text: 'Meta diaria automática' },
-              { icon: <CreditCard className="w-4 h-4" />, text: 'Control de deudas' },
+              { icon: <CalendarDays className="w-4 h-4" />, text: 'Meta diaria personalizada' },
+              { icon: <TrendingUp className="w-4 h-4" />, text: 'Tendencias diarias y mensuales' },
               { icon: <Settings className="w-4 h-4" />, text: 'Sync multi-dispositivo' },
             ].map((f, i) => (
               <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">

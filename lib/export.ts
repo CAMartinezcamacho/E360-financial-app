@@ -1,8 +1,7 @@
-import type { Transaction, FixedExpense } from '@/lib/types'
+import type { Transaction } from '@/lib/types'
 
 export function generateCSVReport(
   transactions: Transaction[],
-  fixedExpenses: FixedExpense[],
   currencySymbol: string
 ): string {
   const lines: string[] = []
@@ -13,16 +12,6 @@ export function generateCSVReport(
     dateStyle: 'full',
     timeStyle: 'short',
   }).format(new Date())}`)
-  lines.push('')
-
-  // Fixed Expenses Section
-  lines.push('=== GASTOS FIJOS MENSUALES ===')
-  lines.push('Nombre,Monto')
-  const totalFixed = fixedExpenses.reduce((sum, e) => sum + e.amount, 0)
-  fixedExpenses.forEach((expense) => {
-    lines.push(`"${expense.name}","${currencySymbol}${expense.amount}"`)
-  })
-  lines.push(`"TOTAL GASTOS FIJOS","${currencySymbol}${totalFixed}"`)
   lines.push('')
 
   // Sort transactions by date (newest first)
@@ -95,8 +84,7 @@ export function generateCSVReport(
   const totalNet = totalSales - totalExpenses
   
   lines.push(`Total Ventas,${currencySymbol}${totalSales}`)
-  lines.push(`Total Gastos Variables,${currencySymbol}${totalExpenses}`)
-  lines.push(`Total Gastos Fijos (mensual),${currencySymbol}${totalFixed}`)
+  lines.push(`Total Gastos,${currencySymbol}${totalExpenses}`)
   lines.push(`Neto Total,${totalNet >= 0 ? '+' : ''}${currencySymbol}${totalNet}`)
   lines.push(`Numero de Transacciones,${transactions.length}`)
 
@@ -105,10 +93,9 @@ export function generateCSVReport(
 
 export function downloadReport(
   transactions: Transaction[],
-  fixedExpenses: FixedExpense[],
   currencySymbol: string
 ): void {
-  const csvContent = generateCSVReport(transactions, fixedExpenses, currencySymbol)
+  const csvContent = generateCSVReport(transactions, currencySymbol)
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   

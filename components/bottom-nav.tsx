@@ -1,8 +1,8 @@
 'use client'
 
-import { CalendarDays, Settings, History, CreditCard } from 'lucide-react'
+import { CalendarDays, Settings, History, Wallet } from 'lucide-react'
 
-type TabType = 'hoy' | 'historial' | 'deudas' | 'ajustes'
+type TabType = 'hoy' | 'historial' | 'cuentas' | 'ajustes'
 
 interface BottomNavProps {
   activeTab: TabType
@@ -13,7 +13,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const tabs: { id: TabType; label: string; icon: typeof CalendarDays }[] = [
     { id: 'hoy', label: 'Hoy', icon: CalendarDays },
     { id: 'historial', label: 'Historial', icon: History },
-    { id: 'deudas', label: 'Deudas', icon: CreditCard },
+    { id: 'cuentas', label: 'Cuentas', icon: Wallet },
     { id: 'ajustes', label: 'Ajustes', icon: Settings },
   ]
 
