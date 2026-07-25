@@ -41,8 +41,8 @@ export function ShiftSummaryModal({ summary, accounts, formatCurrency, gpsKm = 0
   const netMoney = summary.totalEarned - summary.totalExpenses
   const kmForRate = gpsKm > 0 ? gpsKm : summary.totalKm
   const hoursElapsed = (summary.endTime.getTime() - summary.startTime.getTime()) / (1000 * 60 * 60)
-  const perKm = kmForRate > 0 ? netMoney / kmForRate : 0
-  const perHour = hoursElapsed > 0 ? netMoney / hoursElapsed : 0
+  const perKm = kmForRate > 0 ? summary.totalEarned / kmForRate : 0
+  const perHour = hoursElapsed > 0 ? summary.totalEarned / hoursElapsed : 0
 
   return (
     <Dialog open={!!summary} onOpenChange={(open) => !open && onClose()}>
